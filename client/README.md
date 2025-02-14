@@ -4,72 +4,96 @@
 
 This project is a healthcare application that provides functionalities for user authentication and role-based dashboards for patients, doctors, and admins.
 
-## Features
 
-- User Registration and Login
-- Role-based access for Admin, Doctor, and Patient
-- Dashboard for each user role
-- Responsive design
 
 ## File Structure
 
 ```
-healthcare
-├── src
-│   ├── components
-│   │   ├── Auth
-│   │   │   ├── Login.js
-│   │   │   └── Register.js
-│   │   ├── Dashboard
-│   │   │   ├── Admin.js
-│   │   │   ├── Doctor.js
-│   │   │   └── Patient.js
-│   │   └── common
-│   │       ├── Header.js
-│   │       └── Footer.js
-│   ├── styles
-│   │   ├── Login.css
-│   │   └── Register.css
-│   ├── services
-│   │   └── api.js
-│   ├── utils
-│   │   └── helpers.js
-│   ├── App.js
-│   └── index.js
-├── public
-│   └── index.html
-├── package.json
-└── README.md
+healthcare-proj
+├── client
+│   ├── public
+│   │   ├── images
+│   │   │   └── healthcare-bg.jpeg
+│   │   └── index.html
+│   ├── src
+│   │   ├── components
+│   │   │   ├── Authentication
+│   │   │   │   ├── Login.js
+│   │   │   │   └── Register.js
+│   │   │   ├── Dashboard
+│   │   │   │   ├── AdminLanding.js
+│   │   │   │   ├── DoctorLanding.js
+│   │   │   │   └── PatientLanding.js
+│   │   │   ├── AboutUs.js
+│   │   │   ├── Appointments.js
+│   │   │   ├── FindDoctor.js
+│   │   │   ├── Home.js
+│   │   │   ├── MedicalHistory.js
+│   │   │   ├── Header.js
+│   │   │   └── Prescriptions.js
+│   │   ├── styles
+│   │   │   ├── Home.css
+│   │   │   ├── Landing.css
+│   │   │   ├── Login.css
+│   │   │   ├── Patient.css
+│   │   │   └── Register.css
+│   │   ├── App.css
+│   │   ├── App.js
+│   │   ├── index.css
+│   │   └── index.js
+│   ├── package.json
+│   └── README.md
+├── server
+│   └── (server files will be added here)
+└── .gitignore
 ```
 
 ## Installation
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone <repository-url>
    ```
+
 2. Navigate to the project directory:
+   ```bash
+   cd healthcare-proj
    ```
-   cd healthcare
+
+3. Navigate to the client directory:
+   ```bash
+   cd client
    ```
-3. Install the dependencies:
-   ```
+
+4. Install the dependencies:
+   ```bash
    npm install
    ```
 
 ## Usage
 
 To start the application, run:
-```
+```bash
 npm start
 ```
 
 The application will be available at `http://localhost:3000`.
 
-## Contributing
+## Technologies Used
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+- React.js
+- React Router DOM
+- CSS3
+- Node.js (planned for backend)
+- Express.js (planned for backend)
+- Postgres (planned for backend)
 
-## License
+## Future Enhancements
 
-This project is licensed under the MIT License.
+- Backend API Integration
+- User Authentication System
+- Real-time Appointment Updates
+- Electronic Health Records 
+
+
+
