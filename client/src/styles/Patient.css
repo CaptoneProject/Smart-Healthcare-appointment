@@ -1,0 +1,46 @@
+.about-container,
+.find-doctor-container,
+.appointments-container,
+.prescriptions-container,
+.medical-history-container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.doctor-card,
+.appointment-card,
+.prescription-card,
+.record-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+button {
+  background-color: #0EA5E9;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #0284C7;
+}
+
+.search-section {
+  margin: 20px 0;
+}
+
+.search-section input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  margin-right: 10px;
+  width: 300px;
+}

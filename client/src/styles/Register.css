@@ -1,0 +1,162 @@
+.register-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .register-container h2 {
+    color: #2c3e50;
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 5px;
+    margin-top:-10px;
+    font-weight: 700;
+  }
+  
+  .register-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .register-container form input,
+  .register-container form select {
+    padding: 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+  
+  .register-container form input:focus,
+  .register-container form select:focus {
+    border-color: #0EA5E9;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+  
+  .register-container form select {
+    background-color: white;
+    cursor: pointer;
+  }
+  
+  .register-container form button {
+    background-color: #0EA5E9;
+    color: white;
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+  }
+  
+  .register-container form button:hover {
+    background-color: #0284C7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+  }
+  
+  .error {
+    background-color: #fee2e2;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .success {
+    background-color: #dcfce7;
+    color: #16a34a;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-group label {
+    font-weight: 600;
+    color: #374151;
+  }
+  
+  .form-group input,
+  .form-group select {
+    padding: 0.75rem;
+    border: 1px solid #D1D5DB;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #2563EB;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  
+  .error-message {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #FEE2E2;
+    border: 1px solid #EF4444;
+    border-radius: 0.5rem;
+    color: #B91C1C;
+  }
+  
+  .register-button {
+    padding: 0.75rem;
+    background-color: #2563EB;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .register-button:hover {
+    background-color: #1D4ED8;
+  }
+  
+  .register-button:disabled {
+    background-color: #93C5FD;
+    cursor: not-allowed;
+  }
+  
+  /* Required field indicator */
+  .form-group label::after {
+    content: "*";
+    color: #EF4444;
+    margin-left: 0.25rem;
+  }
+  
+  /* Optional fields */
+  .form-group label[for="experienceYears"]::after {
+    content: "";
+  }
+  
+  @media (max-width: 768px) {
+    .register-container {
+      margin: 20px;
+      padding: 20px;
+    }
+    
+    .form-group {
+      flex-direction: column;
+    }
+  }

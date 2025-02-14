@@ -1,0 +1,17 @@
+.landing-container {
+    width: 90%;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    text-align: center;
+  }
+  
+  .landing-container h1 {
+    margin-bottom: 20px;
+  }
+  
+  .landing-container p {
+    font-size: 18px;
+  }
