@@ -6,6 +6,7 @@
     background: white;
     border-radius: 20px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    height: 375px; 
   }
   
   .login-container h2 {
@@ -14,6 +15,8 @@
     text-align: center;
     margin-bottom: 30px;
     font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.5px;
   }
   
   .login-container form {
@@ -28,6 +31,7 @@
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
+    height: 30px; 
   }
   
   .login-container form input:focus {

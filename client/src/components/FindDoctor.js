@@ -9,7 +9,7 @@ const FindDoctor = () => {
         <button>Search</button>
       </div>
       <div className="doctors-grid">
-        {/* Sample doctor card - to be replaced with actual data */}
+        {/* Temporary doctor card - to be replaced with actual data */}
         <div className="doctor-card">
           <h3>Dr. John Doe</h3>
           <p>Specialty: Cardiology</p>

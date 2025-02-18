@@ -22,11 +22,12 @@ function App() {
           <Link to="/">HealthCare</Link>
         </div>
         <div className="nav-links">
-          <Link to="/about">About Us</Link>
-          <Link to="/find-doctor">Find Doctor</Link>
-          <Link to="/appointments">Appointments</Link>
-          <Link to="/prescriptions">Prescriptions</Link>
-          <Link to="/medical-history">Medical History</Link>
+        <Link to="/appointments">Appointments</Link>
+        <Link to="/find-doctor">Find Doctor</Link>
+        <Link to="/prescriptions">Prescriptions</Link>
+        <Link to="/medical-history">Medical History</Link>
+        <Link to="/about">About Us</Link>
+        
         </div>
         <div className="nav-auth">
           <Link to="/login" className="login-btn">Login</Link>

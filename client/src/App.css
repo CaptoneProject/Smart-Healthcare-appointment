@@ -18,8 +18,7 @@
   width: 95%; /* Changed from 100% to 50% */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin: 0 auto; /* Center the navbar */
-  z-index: 1000;
-  border-radius: 0 0 20px 20px; /* Optional: Add rounded corners at bottom */
+  z-index: 1000; 
 }
 
 .nav-brand {

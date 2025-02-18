@@ -1,4 +1,3 @@
-// filepath: /healthcare/src/components/Auth/Register.js
 import React from 'react';
 import { Link } from 'react-router-dom';
 import '../../styles/Register.css';
@@ -62,7 +61,7 @@ const Register = () => {
         </button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '20px' }}>
-        Already have an account? Login
+        Already have an account? <Link to="/login">Click here to Login</Link>
       </p>
     </div>
   );

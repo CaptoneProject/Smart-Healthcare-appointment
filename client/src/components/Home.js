@@ -9,7 +9,7 @@ const Home = () => {
         <h1>Your Health, Our Priority</h1>
         <p className="hero-text">Access world-class healthcare services from the comfort of your home</p>
         <div className="hero-buttons">
-          <Link to="/find-doctor" className="primary-button">Find a Doctor</Link>
+          <Link to="/find-doctor" className="primary-button">Find Doctors</Link>
           <Link to="/register" className="secondary-button">Join Now</Link>
         </div>
       </section>
@@ -20,7 +20,7 @@ const Home = () => {
           <div className="service-card">
             <img src="/images/appointment.svg" alt="Book Appointments" />
             <h3>Book Appointments</h3>
-            <p>Schedule appointments with top doctors at your convenience</p>
+            <p>Schedule appointments with best doctors at your convenience</p>
             <Link to="/appointments" className="service-link">Book Now</Link>
           </div>
 
@@ -83,18 +83,17 @@ const Home = () => {
             <div className="contact-info">
               <p><i className="fas fa-phone"></i> +1 234 567 890</p>
               <p><i className="fas fa-envelope"></i> support@healthcare.com</p>
-              <p><i className="fas fa-map-marker-alt"></i> 123 Healthcare St, Medical City</p>
+              <p><i className="fas fa-map-marker-alt"></i> One Pace Plaza</p>
             </div>
           </div>
         </div>
         
         <div className="footer-bottom">
           <div className="footer-bottom-content">
-            <p>&copy; 2024 Smart Healthcare Management System. All rights reserved.</p>
+            <p>&copy; 2025 Smart Healthcare Appointment & Prescription Management System. All rights reserved.</p>
             <div className="footer-bottom-links">
-              <Link to="/privacy">Privacy Policy</Link>
-              <Link to="/terms">Terms of Service</Link>
-              <Link to="/sitemap">Sitemap</Link>
+              <Link to="/privacy"></Link>
+              <Link to="/terms"></Link>
             </div>
           </div>
         </div>
