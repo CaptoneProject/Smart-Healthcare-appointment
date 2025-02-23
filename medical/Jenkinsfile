@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+
+    environment {
+        NODEJS_HOME = tool 'NodeJS 22.14 LTS'
+        PATH = "${NODEJS_HOME}/bin:${env.PATH}"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/CaptoneProject/Smart-Healthcare-appointment.git'
+            }
+        }
+
+        stage('Move to Medical Folder') {
+            steps {
+                dir('medical') {
+                    echo "Switched to medical directory"
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir('medical') {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('Build React App') {
+            steps {
+                dir('medical') {
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Deploy to Dev Server') {
+            steps {
+                sshagent(['YOUR_SSH_CREDENTIAL_ID']) {
+                    sh '''
+                    scp -r medical/dist/* ec2-user@YOUR_DEV_SERVER_IP:/var/www/html/
+                    ssh ec2-user@YOUR_DEV_SERVER_IP "sudo systemctl restart nginx"
+                    '''
+                }
+            }
+        }
+    }
+}
