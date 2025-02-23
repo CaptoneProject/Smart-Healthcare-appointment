@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Shield, 
   Calendar, 
@@ -10,9 +11,9 @@ import {
   Check,
   LucideIcon 
 } from 'lucide-react';
-import AuthModal from './AuthModal';
+// import AuthModal from './AuthModal';
 
-type AuthMode = 'signin' | 'signup';
+// type AuthMode = 'signin' | 'signup';
 
 interface Feature {
   icon: LucideIcon;
@@ -27,12 +28,6 @@ interface Feature {
     title: string;
   }[];
 }
-
-// interface AuthModalProps {
-//   isOpen: boolean;
-//   onClose: () => void;
-//   initialMode: AuthMode;
-// }
 
 interface FeatureCardProps {
   feature: Feature;
@@ -72,13 +67,19 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => {
 };
 
 const LandingPage: React.FC = () => {
-  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const navigate = useNavigate();
+  // const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  // const [authMode, setAuthMode] = useState<AuthMode>('signin');
 
-  const openAuth = (mode: AuthMode): void => {
-    setAuthMode(mode);
-    setIsAuthOpen(true);
+  // Simplified navigation function for development
+  const handleQuickAccess = () => {
+    navigate('/p/dashboard');
   };
+
+  // const openAuth = (mode: AuthMode): void => {
+  //   // For development, directly navigate to dashboard
+  //   handleQuickAccess();
+  // };
 
   const features: Feature[] = [
     {
@@ -141,13 +142,13 @@ const LandingPage: React.FC = () => {
             <a href="#doctors" className="text-sm hover:text-blue-400">For Doctors</a>
             <a href="#providers" className="text-sm hover:text-blue-400">For Providers</a>
             <button 
-              onClick={() => openAuth('signin')} 
+              onClick={handleQuickAccess} 
               className="px-4 py-2 text-sm bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
             >
-              Sign In
+              Quick Access (Dev)
             </button>
             <button 
-              onClick={() => openAuth('signup')} 
+              onClick={handleQuickAccess}
               className="px-4 py-2 bg-blue-500 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
             >
               Register Now
@@ -171,10 +172,10 @@ const LandingPage: React.FC = () => {
           </p>
           <div className="flex justify-center gap-4">
             <button 
-              onClick={() => openAuth('signup')}
+              onClick={handleQuickAccess}
               className="px-8 py-4 bg-blue-500 rounded-lg text-lg font-medium hover:bg-blue-600 transition-colors flex items-center"
             >
-              Get Started
+              Quick Access
               <Check className="ml-2 w-5 h-5" />
             </button>
             <button className="px-8 py-4 bg-white/10 rounded-lg text-lg font-medium hover:bg-white/20 transition-colors">
@@ -202,10 +203,10 @@ const LandingPage: React.FC = () => {
           </p>
           <div className="flex justify-center gap-4">
             <button 
-              onClick={() => openAuth('signup')}
+              onClick={handleQuickAccess}
               className="px-8 py-4 bg-white text-blue-600 rounded-lg text-lg font-medium hover:bg-gray-100 transition-colors"
             >
-              Get Started Now
+              Quick Access
             </button>
             <button className="px-8 py-4 bg-white/20 rounded-lg text-lg font-medium hover:bg-white/30 transition-colors">
               Contact Sales
@@ -213,13 +214,6 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
-        initialMode={authMode} 
-      />
     </div>
   );
 };

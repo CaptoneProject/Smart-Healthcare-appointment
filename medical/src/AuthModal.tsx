@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Hospital, Mail, Lock, User, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ const initialFormData: FormData = {
 };
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'signin' }) => {
+  const navigate = useNavigate();
   const [isSignIn, setIsSignIn] = useState<boolean>(initialMode === 'signin');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -44,42 +46,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   if (!isOpen) return null;
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (!isSignIn) {
-      if (!formData.name) {
-        newErrors.name = 'Name is required';
-      }
-      
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
-      } else if (formData.confirmPassword !== formData.password) {
-        newErrors.confirmPassword = 'Passwords do not match';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
-    if (validateForm()) {
-      console.log('Form submitted:', formData);
-    }
+    // For development, directly navigate to dashboard
+    navigate('/p/dashboard');
+    onClose();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -88,6 +59,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       ...prev,
       [name]: value
     }));
+    // Clear any errors for this field
     if (errors[name as keyof FormErrors]) {
       setErrors(prev => ({
         ...prev,
@@ -100,6 +72,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setIsSignIn(!isSignIn);
     setErrors({});
     setFormData(initialFormData);
+  };
+
+  // Quick navigation function for development
+  const handleQuickNavigation = () => {
+    navigate('/p/dashboard');
+    onClose();
   };
 
   return (
@@ -256,6 +234,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 focus:ring-offset-slate-900"
             >
               {isSignIn ? 'Sign In' : 'Create Account'}
+            </button>
+
+            {/* Development Quick Access Button */}
+            <button
+              type="button"
+              onClick={handleQuickNavigation}
+              className="w-full bg-green-500 text-white rounded-lg py-2 px-4 hover:bg-green-600 
+                transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 
+                focus:ring-offset-slate-900"
+            >
+              Quick Access (Dev Only)
             </button>
           </form>
 
