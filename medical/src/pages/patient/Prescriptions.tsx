@@ -31,6 +31,7 @@ interface Prescription {
 
 interface PrescriptionCardProps {
   prescription: Prescription;
+  onRequestRefill: (prescription: Prescription) => void;
 }
 
 interface RequestRefillModalProps {
@@ -45,7 +46,7 @@ interface StatCardProps {
   value: string;
 }
 
-const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => {
+const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription, onRequestRefill }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const getStatusColor = (status: string): string => {
@@ -133,7 +134,10 @@ const PrescriptionCard: React.FC<PrescriptionCardProps> = ({ prescription }) => 
               View Details
             </button>
             {prescription.status === 'Active' && prescription.refillsRemaining > 0 && (
-              <button className="flex items-center px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition-colors">
+              <button 
+                onClick={() => onRequestRefill(prescription)}
+                className="flex items-center px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition-colors"
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Request Refill
               </button>
@@ -173,6 +177,7 @@ const RequestRefillModal: React.FC<RequestRefillModalProps> = ({ isOpen, onClose
             <label className="block text-sm font-medium text-white/60 mb-1">Pharmacy</label>
             <select className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90">
               <option>Select Pharmacy</option>
+              <option value={prescription.pharmacy}>{prescription.pharmacy}</option>
             </select>
           </div>
           
@@ -281,6 +286,11 @@ const PatientPrescriptions: React.FC = () => {
     { icon: AlertCircle, label: 'Expiring Soon', value: '1' }
   ];
 
+  const handleRequestRefill = (prescription: Prescription) => {
+    setSelectedPrescription(prescription);
+    setIsRefillModalOpen(true);
+  };
+
   const filteredPrescriptions = prescriptions.filter(prescription => {
     const matchesFilter = activeFilter === 'all' || prescription.status.toLowerCase() === activeFilter;
     const matchesSearch = searchQuery === '' || 
@@ -363,6 +373,7 @@ const PatientPrescriptions: React.FC = () => {
           <PrescriptionCard 
             key={prescription.id} 
             prescription={prescription}
+            onRequestRefill={handleRequestRefill}
           />
         ))}
       </div>
@@ -370,7 +381,10 @@ const PatientPrescriptions: React.FC = () => {
       {/* Refill Request Modal */}
       <RequestRefillModal
         isOpen={isRefillModalOpen}
-        onClose={() => setIsRefillModalOpen(false)}
+        onClose={() => {
+          setIsRefillModalOpen(false);
+          setSelectedPrescription(null);
+        }}
         prescription={selectedPrescription}
       />
     </div>
