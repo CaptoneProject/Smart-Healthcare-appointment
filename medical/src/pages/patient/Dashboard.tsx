@@ -48,7 +48,6 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   value, 
   footer, 
   link, 
-  variant = 'default' 
 }) => (
   <div className="relative overflow-hidden backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 
     shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.15)] 

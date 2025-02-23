@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
-  User, 
   MapPin, 
   Plus,
   Search,
   Filter,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   X
 } from 'lucide-react';
 

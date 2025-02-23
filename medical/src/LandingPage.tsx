@@ -28,11 +28,11 @@ interface Feature {
   }[];
 }
 
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  initialMode: AuthMode;
-}
+// interface AuthModalProps {
+//   isOpen: boolean;
+//   onClose: () => void;
+//   initialMode: AuthMode;
+// }
 
 interface FeatureCardProps {
   feature: Feature;
