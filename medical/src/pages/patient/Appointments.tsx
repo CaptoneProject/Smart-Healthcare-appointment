@@ -5,12 +5,6 @@ import {
   Clock, 
   MapPin, 
   Plus,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  User,
   FileText
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';

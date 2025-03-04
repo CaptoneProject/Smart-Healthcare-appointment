@@ -73,7 +73,7 @@ const Calendar: React.FC<CalendarProps> = ({
   };
 
   // Generate calendar days
-  const renderCalendarDays = (): JSX.Element[] => {
+  const renderCalendarDays = (): React.ReactElement[] => {
     const days = [];
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDayOfMonth = getFirstDayOfMonth(currentDate);
@@ -113,7 +113,7 @@ const Calendar: React.FC<CalendarProps> = ({
               {dayEvents.length > 2 ? (
                 <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5" />
               ) : (
-                dayEvents.map((event, i) => (
+                dayEvents.map((event, _) => (
                   <span 
                     key={`event-${event.id}`}
                     className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5"

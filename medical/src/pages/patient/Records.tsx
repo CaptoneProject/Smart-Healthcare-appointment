@@ -2,25 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
-  Search, 
-  Filter,
   Download,
   Eye,
   CalendarDays,
   User,
   Activity,
-  Pill,
   Plus,
-  ChevronDown,
   Clock,
   Lock,
   Shield,
   AlertTriangle,
   Check,
-  X
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
-import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { FilterBar } from '../../components/ui/FilterBar';

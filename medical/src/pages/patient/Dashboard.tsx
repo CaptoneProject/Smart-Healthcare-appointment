@@ -1,3 +1,4 @@
+// src/pages/patient/Dashboard.tsx
 import React from 'react';
 import { 
   Calendar, 
@@ -6,9 +7,15 @@ import {
   Pill, 
   CreditCard,
   ArrowRight,
+  Plus,
+  User,
   LucideIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Card } from '../../components/ui/Card';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -16,7 +23,6 @@ interface DashboardCardProps {
   value: string | number;
   footer?: string;
   link?: string;
-  variant?: 'default' | 'success' | 'warning';
 }
 
 interface AppointmentCardProps {
@@ -49,85 +55,63 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   footer, 
   link, 
 }) => (
-  <div className="relative overflow-hidden backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 
-    shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.15)] 
-    transition-all duration-300 group">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
-    <div className="relative">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center">
-            <div className="p-2 rounded-lg bg-blue-400/10 backdrop-blur-sm">
-              <Icon className="w-5 h-5 text-blue-400" />
-            </div>
-            <h3 className="ml-3 text-sm font-medium text-gray-300">{title}</h3>
+  <Card>
+    <div className="flex items-start justify-between">
+      <div>
+        <div className="flex items-center">
+          <div className="p-2 rounded-lg bg-blue-400/10 backdrop-blur-sm">
+            <Icon className="w-5 h-5 text-blue-400" />
           </div>
-          <div className="mt-4 text-2xl font-semibold text-white/90">{value}</div>
+          <h3 className="ml-3 text-sm font-medium text-white/60">{title}</h3>
         </div>
+        <div className="mt-4 text-2xl font-semibold text-white/90">{value}</div>
       </div>
-      {footer && link && (
-        <div className="mt-4 pt-4 border-t border-white/5">
-          <Link 
-            to={link} 
-            className="flex items-center text-sm text-blue-400 hover:text-blue-300 group-hover:translate-x-1 transition-all"
-          >
-            {footer}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Link>
-        </div>
-      )}
     </div>
-  </div>
+    {footer && link && (
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <Link 
+          to={link} 
+          className="flex items-center text-sm text-blue-400 hover:text-blue-300 transition-all"
+        >
+          {footer}
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Link>
+      </div>
+    )}
+  </Card>
 );
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ doctor, specialty, date, time, status }) => (
-  <div className="relative overflow-hidden backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 
-    shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.15)] 
-    transition-all duration-300">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
-    <div className="relative">
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="font-medium text-white/90">{doctor}</h3>
-          <p className="text-sm text-gray-400">{specialty}</p>
-        </div>
-        <div className={`px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${
-          status === 'Confirmed' 
-            ? 'bg-green-500/20 text-green-400 border border-green-500/20' 
-            : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'
-        }`}>
-          {status}
-        </div>
+  <Card>
+    <div className="flex justify-between items-start">
+      <div>
+        <h3 className="font-medium text-white/90">{doctor}</h3>
+        <p className="text-sm text-white/60">{specialty}</p>
       </div>
-      <div className="mt-4 flex items-center text-sm text-gray-400">
-        <div className="flex items-center bg-white/5 px-2 py-1 rounded-lg backdrop-blur-sm">
-          <Calendar className="w-4 h-4 mr-2" />
-          {date}
-        </div>
-        <div className="flex items-center bg-white/5 px-2 py-1 rounded-lg backdrop-blur-sm ml-4">
-          <Clock className="w-4 h-4 mr-2" />
-          {time}
-        </div>
+      <StatusBadge status={status} />
+    </div>
+    <div className="mt-4 flex items-center space-x-4">
+      <div className="flex items-center text-white/60 text-sm">
+        <Calendar className="w-4 h-4 mr-2" />
+        {date}
+      </div>
+      <div className="flex items-center text-white/60 text-sm">
+        <Clock className="w-4 h-4 mr-2" />
+        {time}
       </div>
     </div>
-  </div>
+  </Card>
 );
 
 const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, description, to }) => (
-  <Link
-    to={to}
-    className="relative overflow-hidden backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 p-6 
-      shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.15)] 
-      hover:bg-white/10 transition-all duration-300 group"
-  >
-    <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
-    <div className="relative">
-      <div className="p-3 rounded-lg bg-blue-400/10 backdrop-blur-sm w-fit group-hover:bg-blue-400/20 transition-colors">
-        <Icon className="w-8 h-8 text-blue-400" />
+  <Link to={to} className="block">
+    <Card className="hover:bg-white/10 transition-all duration-300 h-full">
+      <div className="p-3 rounded-lg bg-blue-400/10 backdrop-blur-sm w-fit">
+        <Icon className="w-6 h-6 text-blue-400" />
       </div>
-      <h3 className="font-medium mb-2 mt-4 text-white/90 group-hover:text-white transition-colors">{title}</h3>
-      <p className="text-sm text-gray-400">{description}</p>
-    </div>
+      <h3 className="font-medium mb-2 mt-4 text-white/90">{title}</h3>
+      <p className="text-sm text-white/60">{description}</p>
+    </Card>
   </Link>
 );
 
@@ -149,62 +133,112 @@ const PatientDashboard: React.FC = () => {
     }
   ];
 
+  // Data for stats cards
+  const dashboardStats = [
+    {
+      icon: Calendar,
+      title: "Upcoming Appointments",
+      value: "2",
+      footer: "View all appointments",
+      link: "/p/appointments"
+    },
+    {
+      icon: Pill,
+      title: "Active Prescriptions",
+      value: "3",
+      footer: "View prescriptions",
+      link: "/p/prescriptions"
+    },
+    {
+      icon: FileText,
+      title: "Recent Documents",
+      value: "5",
+      footer: "View medical records",
+      link: "/p/records"
+    },
+    {
+      icon: CreditCard,
+      title: "Payment Due",
+      value: "$150.00",
+      footer: "View payments",
+      link: "/p/payments"
+    }
+  ];
+
+  // Data for quick actions
+  const quickActions = [
+    {
+      icon: Calendar,
+      title: "Schedule Appointment",
+      description: "Book a new appointment with a doctor",
+      to: "/p/appointments/new"
+    },
+    {
+      icon: Pill,
+      title: "Request Refill",
+      description: "Request a prescription refill",
+      to: "/p/prescriptions/refill"
+    },
+    {
+      icon: FileText,
+      title: "View Records",
+      description: "Access your medical records",
+      to: "/p/records"
+    }
+  ];
+
   return (
-    <div className="space-y-8 relative">
-      {/* Background Effects */}
-      <div className="absolute top-0 left-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <PageHeader 
+        title="Dashboard" 
+        description="Your healthcare at a glance"
+        action={
+          <Button 
+            variant="primary" 
+            size="md" 
+            icon={<User className="w-4 h-4" />}
+            onClick={() => {}}
+          >
+            My Profile
+          </Button>
+        }
+      />
 
       {/* Welcome Section */}
-      <div className="relative backdrop-blur-sm p-6 rounded-2xl bg-white/5 border border-white/10">
-        <h1 className="text-3xl font-bold text-white/90">Welcome back, John</h1>
-        <p className="text-gray-400 mt-2">Here's an overview of your health management</p>
-      </div>
+      <Card>
+        <h2 className="text-xl font-semibold text-white/90">Welcome back, John</h2>
+        <p className="text-white/60 mt-2">Here's an overview of your health management</p>
+      </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-        <DashboardCard
-          icon={Calendar}
-          title="Upcoming Appointments"
-          value="2"
-          footer="View all appointments"
-          link="/p/appointments"
-        />
-        <DashboardCard
-          icon={Pill}
-          title="Active Prescriptions"
-          value="3"
-          footer="View prescriptions"
-          link="/p/prescriptions"
-        />
-        <DashboardCard
-          icon={FileText}
-          title="Recent Documents"
-          value="5"
-          footer="View medical records"
-          link="/p/records"
-        />
-        <DashboardCard
-          icon={CreditCard}
-          title="Payment Due"
-          value="$150.00"
-          footer="View payments"
-          link="/p/payments"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {dashboardStats.map((stat, index) => (
+          <DashboardCard
+            key={index}
+            icon={stat.icon}
+            title={stat.title}
+            value={stat.value}
+            footer={stat.footer}
+            link={stat.link}
+          />
+        ))}
       </div>
 
       {/* Appointments Section */}
-      <div className="relative">
-        <div className="flex items-center justify-between mb-6">
+      <div>
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white/90">Upcoming Appointments</h2>
-          <Link 
-            to="/p/appointments" 
-            className="text-sm text-blue-400 hover:text-blue-300 flex items-center px-4 py-2 rounded-lg 
-              bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<ArrowRight className="w-4 h-4" />}
+            onClick={() => {}}
+            as={Link}
+            to="/p/appointments"
           >
             View all
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Link>
+          </Button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {upcomingAppointments.map((appointment, index) => (
@@ -214,27 +248,30 @@ const PatientDashboard: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="relative">
-        <h2 className="text-xl font-semibold mb-6 text-white/90">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <QuickActionCard
-            icon={Calendar}
-            title="Schedule Appointment"
-            description="Book a new appointment with a doctor"
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-white/90">Quick Actions</h2>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => {}}
+            as={Link}
             to="/p/appointments/new"
-          />
-          <QuickActionCard
-            icon={Pill}
-            title="Request Refill"
-            description="Request a prescription refill"
-            to="/p/prescriptions/refill"
-          />
-          <QuickActionCard
-            icon={FileText}
-            title="View Records"
-            description="Access your medical records"
-            to="/p/records"
-          />
+          >
+            New Appointment
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {quickActions.map((action, index) => (
+            <QuickActionCard 
+              key={index}
+              icon={action.icon}
+              title={action.title}
+              description={action.description}
+              to={action.to}
+            />
+          ))}
         </div>
       </div>
     </div>
