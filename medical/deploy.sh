@@ -10,7 +10,7 @@ npm run build
 
 pm2 delete healthcare-app || true
 
-pm2 start serve --name healthcare-app -- --single --port 3000 --no-clipboard
+pm2 start "serve -s dist -p 3000 --no-clipboard" --name healthcare-app
 
 pm2 save
 
