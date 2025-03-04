@@ -1,24 +1,27 @@
 #!/bin/bash
-set -e
 
-echo "🚀 Deploying Smart Healthcare Vite App from Jenkins"
+set -e  # Exit immediately if a command fails
 
-# Navigate to the project directory (this is the directory where `package.json` is located)
+echo "🚀 Deploying Healthcare App..."
+
+# Move into the medical directory (where this script lives)
 cd "$(dirname "$0")"
 
-# Install dependencies (safe if already installed)
+# Install dependencies (safe to re-run every time)
 npm install
 
-# Build the Vite project
+# Build the app (outputs to dist/)
 npm run build
 
-# Stop any existing running app
+# Stop and delete old process if it exists (safe redeploy)
+pm2 stop healthcare-app || true
 pm2 delete healthcare-app || true
 
-# Start the app using `serve` to serve static files from dist
-pm2 start serve --name healthcare-app -- -s dist -l 3000
+# Start the app via serve (bind to 0.0.0.0 so external traffic works)
+pm2 start serve --name healthcare-app -- -s dist -l 3000 --host 0.0.0.0
 
-# Save PM2 process list so it auto-restores on reboot
+# Save PM2 process list (so it restarts after reboot)
 pm2 save
 
-echo "✅ App deployed and running at: http://18.225.149.38:3000"
+# Print confirmation with public IP (just for your logs)
+echo "✅ App deployed and running at: http://$(curl -s http://checkip.amazonaws.com):3000"
