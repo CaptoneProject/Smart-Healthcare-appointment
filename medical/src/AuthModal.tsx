@@ -12,7 +12,7 @@ interface FormData {
   email: string;
   password: string;
   name: string;
-  userType: 'patient' | 'doctor';
+  userType: 'patient' | 'doctor' | 'provider';  // Add 'provider' type
   confirmPassword: string;
 }
 
@@ -82,14 +82,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      {/* Backdrop */}
+      {/* Backdrop - increased blur and opacity */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-xl"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl">
+      {/* Modal - increased opacity and blur */}
+      <div className="relative w-full max-w-md mx-4 bg-white/15 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl">
         {/* Close button */}
         <button 
           onClick={onClose}
@@ -137,8 +137,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-white">I am a</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    {(['patient', 'doctor'] as const).map((type) => (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['patient', 'doctor', 'provider'] as const).map((type) => (
                       <button
                         key={type}
                         type="button"
@@ -147,9 +147,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                           formData.userType === type 
                             ? 'border-blue-500 bg-blue-500/20 text-blue-400' 
                             : 'border-white/20 bg-white/10 hover:bg-white/20 text-white'
-                        } transition-all capitalize`}
+                        } transition-all capitalize text-sm`}
                       >
-                        {type}
+                        {type === 'provider' ? 'Healthcare Provider' : type}
                       </button>
                     ))}
                   </div>
