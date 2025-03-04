@@ -3,7 +3,8 @@ set -e
 
 echo "🚀 Deploying Smart Healthcare Vite App from Jenkins"
 
-cd medical
+# Always work from the correct folder, whether locally or from Jenkins
+cd "$(dirname "$0")"
 
 npm install
 npm run build
