@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit immediately on error
+set -e  # Exit on first error
 
 echo "🚀 Deploying Healthcare App..."
 
@@ -15,14 +15,11 @@ if [ ! -d "dist" ]; then
     exit 1
 fi
 
-# Stop old process if exists
-pm2 stop healthcare-app || true
-pm2 delete healthcare-app || true
+# Kill any existing `serve` processes on port 3000 (just in case)
+sudo fuser -k 3000/tcp || true
 
-# Start using the correct working command
-pm2 start --name healthcare-app -- npx serve -s dist -l 3000
-
-# Save process list
-pm2 save
+# Start serve directly (this process will be managed by Jenkins itself)
+npx serve -s dist -l 3000 &
+disown  # Optional to fully detach if needed
 
 echo "✅ App deployed at: http://$(curl -s http://checkip.amazonaws.com):3000"
