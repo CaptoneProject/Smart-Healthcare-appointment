@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on error
+set -e  # Exit on first error
 
 echo "🚀 Deploying Healthcare App..."
 echo "📂 Current directory: $(pwd)"
@@ -12,7 +12,8 @@ npm run build
 
 pkill -f "serve -s dist -l" || true
 
-nohup npx serve -s dist -l tcp://0.0.0.0:3000 > ./app.log 2>&1 &
+# Correct way to bind to all interfaces
+HOST=0.0.0.0 nohup npx serve -s dist -l 3000 > ./app.log 2>&1 &
 
 echo $! > ./app.pid
 
