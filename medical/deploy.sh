@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on first error
+set -e  # Fail fast on errors
 
 echo "🚀 Deploying Healthcare App..."
 
@@ -15,11 +15,10 @@ if [ ! -d "dist" ]; then
     exit 1
 fi
 
-# Kill any existing `serve` processes on port 3000 (just in case)
-sudo fuser -k 3000/tcp || true
+# Kill anything already on 3000 (optional)
+fuser -k 3000/tcp || true  # No sudo needed if Jenkins owns the port
 
-# Start serve directly (this process will be managed by Jenkins itself)
-npx serve -s dist -l 3000 &
-disown  # Optional to fully detach if needed
+# Start serve fully detached (does NOT tie to Jenkins)
+nohup npx serve -s dist -l 3000 > serve.log 2>&1 &
 
 echo "✅ App deployed at: http://$(curl -s http://checkip.amazonaws.com):3000"
