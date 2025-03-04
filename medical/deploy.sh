@@ -10,8 +10,7 @@ npm run build
 
 pm2 delete healthcare-app || true
 
-# Correct way to pass arguments to `serve` via PM2
-pm2 start serve --name healthcare-app -- -s dist -l tcp://0.0.0.0:3000
+pm2 start serve --name healthcare-app -- --single --port 3000 --no-clipboard
 
 pm2 save
 
