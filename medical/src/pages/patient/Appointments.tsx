@@ -9,14 +9,18 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  User,
+  FileText
 } from 'lucide-react';
-import {Card} from '../../components/ui/Card';
-import {StatusBadge} from '../../components/ui/StatusBadge';
-import {Modal} from '../../components/ui/Modal';
-import {Button} from '../../components/ui/Button';
-import {FilterBar} from '../../components/ui/FilterBar';
+import { Card } from '../../components/ui/Card';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
+import { FilterBar } from '../../components/ui/FilterBar';
 import { PageHeader } from '../../components/ui/PageHeader';
+import Calendar from '../../components/Calendar';
+import AppointmentForm, { AppointmentFormData } from '../../components/forms/AppointmentForm';
 
 interface Appointment {
   id: number;
@@ -31,9 +35,15 @@ interface Appointment {
 
 interface AppointmentCardProps {
   appointment: Appointment;
+  onViewDetails: (appointment: Appointment) => void;
+  onCancelAppointment: (appointmentId: number) => void;
 }
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment }) => {
+const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
+  appointment, 
+  onViewDetails, 
+  onCancelAppointment 
+}) => {
   return (
     <Card>
       <div className="flex justify-between items-start mb-4">
@@ -55,14 +65,26 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment }) => {
           <MapPin className="w-4 h-4 mr-2" />
           {appointment.location}
         </div>
+        <div className="flex items-center text-white/60">
+          <FileText className="w-4 h-4 mr-2" />
+          {appointment.type}
+        </div>
       </div>
 
       <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-        <Button variant="ghost" size="sm">
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => onViewDetails(appointment)}
+        >
           View Details
         </Button>
         {appointment.status === 'Confirmed' && (
-          <Button variant="danger" size="sm">
+          <Button 
+            variant="danger" 
+            size="sm"
+            onClick={() => onCancelAppointment(appointment.id)}
+          >
             Cancel Appointment
           </Button>
         )}
@@ -71,13 +93,60 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment }) => {
   );
 };
 
-const NewAppointmentModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
-  isOpen, 
-  onClose 
+interface AppointmentDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment: Appointment | null;
+}
+
+const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
+  isOpen,
+  onClose,
+  appointment
 }) => {
+  if (!appointment) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Schedule New Appointment">
-      {/* Add appointment form here */}
+    <Modal isOpen={isOpen} onClose={onClose} title="Appointment Details">
+      <div className="space-y-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-xl font-semibold text-white/90">{appointment.doctor}</h3>
+            <p className="text-white/60">{appointment.specialty}</p>
+          </div>
+          <StatusBadge status={appointment.status} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 pb-4">
+          <div>
+            <p className="text-white/60 text-sm">Date</p>
+            <p className="text-white/90">{appointment.date}</p>
+          </div>
+          <div>
+            <p className="text-white/60 text-sm">Time</p>
+            <p className="text-white/90">{appointment.time}</p>
+          </div>
+          <div>
+            <p className="text-white/60 text-sm">Location</p>
+            <p className="text-white/90">{appointment.location}</p>
+          </div>
+          <div>
+            <p className="text-white/60 text-sm">Type</p>
+            <p className="text-white/90">{appointment.type}</p>
+          </div>
+        </div>
+
+        <div className="border-t border-white/10 pt-4 flex justify-end space-x-3">
+          {appointment.status === 'Confirmed' && (
+            <Button variant="secondary" size="sm">
+              Reschedule
+            </Button>
+          )}
+          <Button variant="primary" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 };
@@ -86,6 +155,10 @@ const PatientAppointments: React.FC = () => {
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState<boolean>(false);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
+  const [appointmentToCancel, setAppointmentToCancel] = useState<number | null>(null);
 
   const appointments: Appointment[] = [
     {
@@ -120,10 +193,34 @@ const PatientAppointments: React.FC = () => {
     }
   ];
 
+  // Convert appointments to calendar events
+  const calendarEvents = appointments.map(appointment => ({
+    id: appointment.id,
+    date: new Date(appointment.date),
+    title: `${appointment.time} - ${appointment.doctor}`,
+    type: appointment.type
+  }));
+
   const filteredAppointments = appointments.filter(appointment => {
-    if (filter === 'all') return true;
-    const isUpcoming = new Date(`${appointment.date} ${appointment.time}`) > new Date();
-    return filter === 'upcoming' ? isUpcoming : !isUpcoming;
+    // Filter by status
+    if (filter !== 'all') {
+      const isUpcoming = new Date(`${appointment.date} ${appointment.time}`) > new Date();
+      if (filter === 'upcoming' && !isUpcoming) return false;
+      if (filter === 'past' && isUpcoming) return false;
+    }
+    
+    // Filter by search query
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        appointment.doctor.toLowerCase().includes(searchLower) ||
+        appointment.specialty.toLowerCase().includes(searchLower) ||
+        appointment.location.toLowerCase().includes(searchLower) ||
+        appointment.type.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return true;
   });
 
   const filterOptions = [
@@ -131,6 +228,38 @@ const PatientAppointments: React.FC = () => {
     { id: 'upcoming', label: 'Upcoming' },
     { id: 'past', label: 'Past' }
   ];
+
+  const handleViewDetails = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCancelAppointment = (appointmentId: number) => {
+    setAppointmentToCancel(appointmentId);
+    setIsCancelModalOpen(true);
+  };
+
+  const confirmCancelAppointment = () => {
+    // In a real app, this would make an API call
+    console.log(`Cancelling appointment ${appointmentToCancel}`);
+    setIsCancelModalOpen(false);
+    setAppointmentToCancel(null);
+    // Would then refresh appointments list
+  };
+
+  const handleScheduleAppointment = (data: AppointmentFormData) => {
+    // In a real app, this would make an API call
+    console.log('Scheduling appointment with data:', data);
+    setIsNewAppointmentOpen(false);
+    // Would then refresh appointments list
+  };
+
+  const handleCalendarEventClick = (event: any) => {
+    const appointment = appointments.find(a => a.id === event.id);
+    if (appointment) {
+      handleViewDetails(appointment);
+    }
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -161,34 +290,83 @@ const PatientAppointments: React.FC = () => {
       />
 
       {/* Calendar View */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white/90">Calendar</h2>
-          <div className="flex items-center gap-2">
-            <button className="p-1 text-white/60 hover:text-white/90 transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <span className="text-sm font-medium text-white/80">February 2025</span>
-            <button className="p-1 text-white/60 hover:text-white/90 transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        {/* Add calendar component here */}
-      </Card>
+      <Calendar 
+        events={calendarEvents}
+        onEventClick={handleCalendarEventClick}
+      />
 
       {/* Appointments List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredAppointments.map((appointment) => (
-          <AppointmentCard key={appointment.id} appointment={appointment} />
-        ))}
+        {filteredAppointments.length > 0 ? (
+          filteredAppointments.map((appointment) => (
+            <AppointmentCard 
+              key={appointment.id} 
+              appointment={appointment} 
+              onViewDetails={handleViewDetails}
+              onCancelAppointment={handleCancelAppointment}
+            />
+          ))
+        ) : (
+          <div className="col-span-1 lg:col-span-2 flex justify-center p-10">
+            <div className="text-center">
+              <p className="text-white/60">No appointments found matching your criteria.</p>
+              <Button 
+                variant="primary" 
+                size="md" 
+                className="mt-4"
+                onClick={() => setIsNewAppointmentOpen(true)}
+              >
+                Schedule New Appointment
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* New Appointment Modal */}
-      <NewAppointmentModal 
+      <Modal 
         isOpen={isNewAppointmentOpen}
         onClose={() => setIsNewAppointmentOpen(false)}
+        title="Schedule New Appointment"
+      >
+        <AppointmentForm 
+          onSubmit={handleScheduleAppointment}
+          onCancel={() => setIsNewAppointmentOpen(false)}
+        />
+      </Modal>
+
+      {/* Appointment Details Modal */}
+      <AppointmentDetailsModal 
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        appointment={selectedAppointment}
       />
+
+      {/* Cancel Appointment Confirmation Modal */}
+      <Modal
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        title="Cancel Appointment"
+      >
+        <div className="py-4">
+          <p className="text-white/90">Are you sure you want to cancel this appointment?</p>
+          <p className="text-white/60 mt-2">This action cannot be undone.</p>
+        </div>
+        <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+          <Button 
+            variant="secondary" 
+            onClick={() => setIsCancelModalOpen(false)}
+          >
+            Keep Appointment
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={confirmCancelAppointment}
+          >
+            Cancel Appointment
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
