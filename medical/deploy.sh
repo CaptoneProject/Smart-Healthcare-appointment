@@ -1,27 +1,38 @@
 #!/bin/bash
 
-set -e  # Exit immediately if a command fails
+set -e  # Stop immediately if any command fails
 
 echo "🚀 Deploying Healthcare App..."
 
-# Move into the medical directory (where this script lives)
+# Move into the right directory (medical)
 cd "$(dirname "$0")"
 
-# Install dependencies (safe to re-run every time)
+echo "📂 Current directory: $(pwd)"
+
+# Install dependencies
 npm install
 
-# Build the app (outputs to dist/)
+# Build the app
 npm run build
 
-# Stop and delete old process if it exists (safe redeploy)
+# Check if dist exists after build (mandatory)
+if [ ! -d "dist" ]; then
+    echo "❌ Build failed: dist folder missing"
+    exit 1
+fi
+
+# Stop & delete old process safely
 pm2 stop healthcare-app || true
 pm2 delete healthcare-app || true
 
-# Start the app via serve (bind to 0.0.0.0 so external traffic works)
+# Log the command to be sure
+echo "⚙️ Starting serve using PM2 (this time correctly!)"
+
+# Start the app correctly (no weird "bash" process tricks)
 pm2 start serve --name healthcare-app -- -s dist -l 3000 --host 0.0.0.0
 
-# Save PM2 process list (so it restarts after reboot)
+# Save PM2 list for auto-restart
 pm2 save
 
-# Print confirmation with public IP (just for your logs)
-echo "✅ App deployed and running at: http://$(curl -s http://checkip.amazonaws.com):3000"
+# Final confirmation
+echo "✅ App deployed at: http://$(curl -s http://checkip.amazonaws.com):3000"
