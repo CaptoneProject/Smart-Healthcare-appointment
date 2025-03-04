@@ -1,4 +1,4 @@
-import React, { ReactNode, ElementType, ComponentPropsWithoutRef } from 'react';
+import { ReactNode, ElementType, ComponentPropsWithoutRef } from 'react';
 
 type ButtonProps<E extends ElementType = 'button'> = {
   children: ReactNode;
