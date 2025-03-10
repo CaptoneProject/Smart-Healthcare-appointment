@@ -75,8 +75,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   };
 
   // Quick navigation function for development
-  const handleQuickNavigation = () => {
-    navigate('/p/dashboard');
+  const handleQuickNavigation = (userType: 'patient' | 'doctor' | 'provider') => {
+    const route = userType === 'patient' ? '/p/dashboard' : 
+                 userType === 'doctor' ? '/d/dashboard' : 
+                 '/provider/dashboard';
+    navigate(route);
     onClose();
   };
 
@@ -236,16 +239,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               {isSignIn ? 'Sign In' : 'Create Account'}
             </button>
 
-            {/* Development Quick Access Button */}
-            <button
-              type="button"
-              onClick={handleQuickNavigation}
-              className="w-full bg-green-500 text-white rounded-lg py-2 px-4 hover:bg-green-600 
-                transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 
-                focus:ring-offset-slate-900"
-            >
-              Quick Access (Dev Only)
-            </button>
+            {/* Development Quick Access Section */}
+            <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+              <p className="text-sm text-gray-400 mb-2">Development Quick Access</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleQuickNavigation('patient')}
+                  className="bg-green-600/70 hover:bg-green-500 text-white text-xs py-1 px-2 rounded"
+                >
+                  Patient Portal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickNavigation('doctor')}
+                  className="bg-purple-600/70 hover:bg-purple-500 text-white text-xs py-1 px-2 rounded"
+                >
+                  Doctor Portal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickNavigation('provider')}
+                  className="bg-orange-600/70 hover:bg-orange-500 text-white text-xs py-1 px-2 rounded"
+                >
+                  Provider Portal
+                </button>
+              </div>
+            </div>
           </form>
 
           {/* Toggle Sign In/Sign Up */}
