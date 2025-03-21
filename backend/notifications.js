@@ -3,9 +3,13 @@ const router = express.Router();
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 
-// Database connection
+// Database connection - Match the format from server.js
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'smartcare',
+  password: process.env.DB_PASSWORD || 'vedang18',
+  port: process.env.DB_PORT || 5432,
 });
 
 // Initialize tables
@@ -141,8 +145,100 @@ router.put('/notifications/:id/read', async (req, res) => {
   }
 });
 
-module.exports = {
-  router,
-  sendNotification,
-  sendAppointmentReminder
+// Add these helper functions
+
+// Get appointment details by ID
+const getAppointmentDetails = async (appointmentId) => {
+  try {
+    const result = await pool.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [appointmentId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error getting appointment details:', error);
+    return null;
+  }
+};
+
+// Create a notification in database
+const createNotification = async (notification) => {
+  try {
+    await pool.query(
+      `INSERT INTO notifications
+       (user_id, type, title, message, related_id, is_read)
+       VALUES ($1, $2, $3, $4, $5, false)`,
+      [
+        notification.userId,
+        notification.type,
+        notification.title,
+        notification.message,
+        notification.relatedId
+      ]
+    );
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+};
+
+// Get notification title based on type
+const getNotificationTitle = (type) => {
+  switch (type) {
+    case 'APPOINTMENT_CREATED':
+      return 'New Appointment';
+    case 'APPOINTMENT_RESCHEDULED':
+      return 'Appointment Rescheduled';
+    case 'APPOINTMENT_CANCELLED':
+      return 'Appointment Cancelled';
+    default:
+      return 'Appointment Update';
+  }
+};
+
+// Get notification message based on type and appointment
+const getNotificationMessage = (type, appointment) => {
+  const dateStr = new Date(appointment.date).toLocaleDateString();
+  switch (type) {
+    case 'APPOINTMENT_CREATED':
+      return `Appointment scheduled with Dr. ${appointment.doctor_name} on ${dateStr} at ${appointment.time}`;
+    case 'APPOINTMENT_RESCHEDULED':
+      return `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled to ${dateStr} at ${appointment.time}`;
+    case 'APPOINTMENT_CANCELLED':
+      return `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} has been cancelled`;
+    default:
+      return `Your appointment with Dr. ${appointment.doctor_name} has been updated`;
+  }
+};
+
+module.exports = router;
+module.exports.sendAppointmentNotification = async (data) => {
+  try {
+    // Get appointment details
+    const appointment = await getAppointmentDetails(data.appointmentId);
+    if (!appointment) return;
+    
+    // Create notification for patient
+    await createNotification({
+      userId: appointment.patient_id,
+      type: data.type,
+      title: getNotificationTitle(data.type),
+      message: getNotificationMessage(data.type, appointment),
+      relatedId: data.appointmentId
+    });
+    
+    // Create notification for doctor
+    await createNotification({
+      userId: appointment.doctor_id,
+      type: data.type,
+      title: getNotificationTitle(data.type),
+      message: getNotificationMessage(data.type, appointment),
+      relatedId: data.appointmentId
+    });
+  } catch (error) {
+    console.error('Error sending appointment notification:', error);
+  }
 };

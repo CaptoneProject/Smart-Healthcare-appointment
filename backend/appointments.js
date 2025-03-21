@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 const moment = require('moment');
+const { sendAppointmentNotification } = require('./notifications');
 
-// Database connection
+// Database connection - Match the format from server.js
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'smartcare',
+  password: process.env.DB_PASSWORD || 'vedang18',
+  port: process.env.DB_PORT || 5432,
 });
 
 // Initialize tables
@@ -49,8 +54,39 @@ const checkAvailability = async (doctorId, date, time) => {
   return result.rows.length === 0;
 };
 
-// Create appointment
-router.post('/appointments', async (req, res) => {
+// GET /api/appointments
+router.get('/', async (req, res) => {
+  try {
+    const { userId, userType, startDate, endDate } = req.query;
+
+    let query = `
+      SELECT a.*, 
+        p.name as patient_name, 
+        d.name as doctor_name
+      FROM appointments a
+      JOIN users p ON a.patient_id = p.id
+      JOIN users d ON a.doctor_id = d.id
+      WHERE date BETWEEN $1 AND $2
+    `;
+
+    if (userType === 'patient') {
+      query += ' AND patient_id = $3';
+    } else if (userType === 'doctor') {
+      query += ' AND doctor_id = $3';
+    }
+
+    query += ' ORDER BY date, time';
+
+    const result = await pool.query(query, [startDate, endDate, userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/appointments
+router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
 
@@ -85,39 +121,8 @@ router.post('/appointments', async (req, res) => {
   }
 });
 
-// Get appointments
-router.get('/appointments', async (req, res) => {
-  try {
-    const { userId, userType, startDate, endDate } = req.query;
-
-    let query = `
-      SELECT a.*, 
-        p.name as patient_name, 
-        d.name as doctor_name
-      FROM appointments a
-      JOIN users p ON a.patient_id = p.id
-      JOIN users d ON a.doctor_id = d.id
-      WHERE date BETWEEN $1 AND $2
-    `;
-
-    if (userType === 'patient') {
-      query += ' AND patient_id = $3';
-    } else if (userType === 'doctor') {
-      query += ' AND doctor_id = $3';
-    }
-
-    query += ' ORDER BY date, time';
-
-    const result = await pool.query(query, [startDate, endDate, userId]);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching appointments:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // Reschedule appointment
-router.put('/appointments/:id', async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { date, time } = req.body;
@@ -149,7 +154,7 @@ router.put('/appointments/:id', async (req, res) => {
 });
 
 // Cancel appointment
-router.delete('/appointments/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 

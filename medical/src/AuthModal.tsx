@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Hospital, Mail, Lock, User, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,7 +13,7 @@ interface FormData {
   email: string;
   password: string;
   name: string;
-  userType: 'patient' | 'doctor' | 'provider';  // Add 'provider' type
+  userType: 'patient' | 'doctor' | 'provider';
   confirmPassword: string;
 }
 
@@ -33,24 +34,82 @@ const initialFormData: FormData = {
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const navigate = useNavigate();
+  const { login, register, loading, error: authError } = useAuth();
   const [isSignIn, setIsSignIn] = useState<boolean>(initialMode === 'signin');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsSignIn(initialMode === 'signin');
     setFormData(initialFormData);
     setErrors({});
+    setFormError(null);
   }, [initialMode]);
+
+  useEffect(() => {
+    // Update form error when auth error changes
+    if (authError) {
+      setFormError(authError);
+    }
+  }, [authError]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    if (!isSignIn) {
+      if (!formData.name) {
+        newErrors.name = 'Name is required';
+      }
+      
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    // For development, directly navigate to dashboard
-    navigate('/p/dashboard');
-    onClose();
+    setFormError(null);
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      if (isSignIn) {
+        await login(formData.email, formData.password);
+      } else {
+        await register({
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          userType: formData.userType
+        });
+      }
+      onClose();
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      setFormError(err.message || 'An error occurred during authentication');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -72,15 +131,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setIsSignIn(!isSignIn);
     setErrors({});
     setFormData(initialFormData);
+    setFormError(null);
   };
 
   // Quick navigation function for development
-  const handleQuickNavigation = (userType: 'patient' | 'doctor' | 'provider') => {
-    const route = userType === 'patient' ? '/p/dashboard' : 
-                 userType === 'doctor' ? '/d/dashboard' : 
-                 '/provider/dashboard';
-    navigate(route);
-    onClose();
+  const handleQuickNavigation = async (userType: 'patient' | 'doctor' | 'admin') => {
+    try {
+      // Call your auth service to simulate login with the specific user type
+      let loginResponse;
+      if (userType === 'admin') {
+        loginResponse = await login('admin@smartcare.com', 'admin123');
+        console.log('Admin login response:', loginResponse);
+      } else if (userType === 'doctor') {
+        loginResponse = await login('doctor@smartcare.com', 'doctor123');
+      } else {
+        loginResponse = await login('patient@smartcare.com', 'patient123');
+      }
+
+      // Check localStorage for token
+      const token = localStorage.getItem('accessToken');
+      console.log('Token after login:', token ? 'Token exists' : 'No token');
+
+      // Then navigate
+      const route = userType === 'patient' ? '/p/dashboard' : 
+                   userType === 'doctor' ? '/d/dashboard' : 
+                   '/admin/dashboard';
+      navigate(route);
+      onClose();
+    } catch (error) {
+      console.error('Quick navigation error:', error);
+      setFormError('Failed to authenticate. Please try again.');
+    }
   };
 
   return (
@@ -116,6 +197,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               ? 'Sign in to access your account' 
               : 'Join SmartCare for better healthcare management'}
           </p>
+
+          {/* Form Error Message */}
+          {formError && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+              <p className="text-red-400 text-sm">{formError}</p>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -232,11 +320,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
             <button
               type="submit"
-              className="w-full bg-blue-500 text-white rounded-lg py-2 px-4 hover:bg-blue-600 
+              disabled={loading}
+              className={`w-full bg-blue-500 text-white rounded-lg py-2 px-4 hover:bg-blue-600 
                 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
-                focus:ring-offset-slate-900"
+                focus:ring-offset-slate-900 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              {isSignIn ? 'Sign In' : 'Create Account'}
+              {loading 
+                ? 'Processing...' 
+                : isSignIn ? 'Sign In' : 'Create Account'}
             </button>
 
             {/* Development Quick Access Section */}
@@ -259,10 +350,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleQuickNavigation('provider')}
-                  className="bg-orange-600/70 hover:bg-orange-500 text-white text-xs py-1 px-2 rounded"
+                  onClick={() => handleQuickNavigation('admin')}
+                  className="bg-blue-600/70 hover:bg-blue-500 text-white text-xs py-1 px-2 rounded"
                 >
-                  Provider Portal
+                  Admin Portal
                 </button>
               </div>
             </div>

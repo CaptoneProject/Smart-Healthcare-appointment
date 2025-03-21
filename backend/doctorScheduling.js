@@ -2,9 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 
-// Database connection
+// Database connection - Match the format from server.js
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'smartcare',
+  password: process.env.DB_PASSWORD || 'vedang18',
+  port: process.env.DB_PORT || 5432,
 });
 
 // Initialize tables
@@ -48,6 +52,23 @@ const initTables = async () => {
       reason TEXT,
       status VARCHAR(20) DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS doctor_credentials (
+      id SERIAL PRIMARY KEY,
+      doctor_id INTEGER REFERENCES users(id) UNIQUE,
+      degree VARCHAR(100),
+      license_number VARCHAR(100),
+      specialization VARCHAR(100),
+      subspecialization VARCHAR(100),
+      years_of_experience INTEGER,
+      biography TEXT,
+      education_history TEXT,
+      verification_status VARCHAR(20) DEFAULT 'pending',
+      verified_by INTEGER,
+      verification_notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 };
@@ -225,6 +246,112 @@ router.get('/doctors/:id/daily-schedule', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching daily schedule:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get list of doctors
+router.get('/doctors', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, user_type as specialty FROM users 
+       WHERE user_type = 'doctor'`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching doctors:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this route to handle doctor credentials submission
+router.post('/credentials', async (req, res) => {
+  try {
+    const { 
+      doctorId, 
+      degree, 
+      licenseNumber, 
+      specialization, 
+      yearsOfExperience,
+      biography,
+      educationHistory
+    } = req.body;
+
+    // Store in database with pending status
+    await pool.query(
+      `INSERT INTO doctor_credentials 
+       (doctor_id, degree, license_number, specialization, years_of_experience, 
+        biography, education_history, verification_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (doctor_id) 
+       DO UPDATE SET
+         degree = $2,
+         license_number = $3,
+         specialization = $4,
+         years_of_experience = $5,
+         biography = $6,
+         education_history = $7,
+         verification_status = $8,
+         updated_at = NOW()`,
+      [doctorId, degree, licenseNumber, specialization, yearsOfExperience, 
+       biography, educationHistory, 'pending']
+    );
+
+    res.status(201).json({ 
+      message: 'Credentials submitted successfully for verification' 
+    });
+  } catch (error) {
+    console.error('Error submitting credentials:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this route to check doctor credentials status
+router.get('/doctors/:id/credentials-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'SELECT id FROM doctor_credentials WHERE doctor_id = $1',
+      [id]
+    );
+    
+    res.json({ 
+      hasSubmittedCredentials: result.rows.length > 0 
+    });
+  } catch (error) {
+    console.error('Error checking credentials status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this endpoint near the credentials endpoint
+router.get('/credentials-status/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if doctor has submitted credentials
+    const result = await pool.query(
+      `SELECT * FROM doctor_credentials 
+       WHERE doctor_id = $1`,
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.json({ 
+        hasSubmittedCredentials: false 
+      });
+    }
+    
+    const credentials = result.rows[0];
+    
+    res.json({
+      hasSubmittedCredentials: true,
+      status: credentials.verification_status,
+      isApproved: credentials.verification_status === 'approved'
+    });
+  } catch (error) {
+    console.error('Error checking credentials status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

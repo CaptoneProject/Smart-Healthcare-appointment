@@ -1,5 +1,5 @@
 // src/pages/patient/Appointments.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -15,6 +15,8 @@ import { FilterBar } from '../../components/ui/FilterBar';
 import { PageHeader } from '../../components/ui/PageHeader';
 import Calendar from '../../components/Calendar';
 import AppointmentForm, { AppointmentFormData } from '../../components/forms/AppointmentForm';
+import { appointmentService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface Appointment {
   id: number;
@@ -146,6 +148,7 @@ const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
 };
 
 const PatientAppointments: React.FC = () => {
+  const { user } = useAuth();
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState<boolean>(false);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -153,39 +156,60 @@ const PatientAppointments: React.FC = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [appointmentToCancel, setAppointmentToCancel] = useState<number | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const appointments: Appointment[] = [
-    {
-      id: 1,
-      doctor: "Dr. Sarah Wilson",
-      specialty: "General Physician",
-      date: "Feb 24, 2025",
-      time: "10:00 AM",
-      location: "Main Street Clinic, Room 204",
-      status: "Confirmed",
-      type: "Check-up"
-    },
-    {
-      id: 2,
-      doctor: "Dr. Michael Chen",
-      specialty: "Cardiologist",
-      date: "Feb 26, 2025",
-      time: "2:30 PM",
-      location: "Heart Care Center, Room 105",
-      status: "Pending",
-      type: "Consultation"
-    },
-    {
-      id: 3,
-      doctor: "Dr. Emily Rodriguez",
-      specialty: "Dermatologist",
-      date: "Feb 20, 2025",
-      time: "3:45 PM",
-      location: "Skin Care Clinic, Room 302",
-      status: "Completed",
-      type: "Follow-up"
+  useEffect(() => {
+    // Only fetch if user is logged in
+    if (user) {
+      fetchAppointments();
     }
-  ];
+  }, [user]);
+
+  const fetchAppointments = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get date range for the past 6 months and next 6 months
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 6);
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 6);
+      
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      const data = await appointmentService.getAppointments({
+        userId: user.id,
+        userType: 'patient',
+        startDate: formattedStartDate,
+        endDate: formattedEndDate
+      });
+      
+      // Transform API data to match component's expected format
+      const transformedData = data.map((item: any) => ({
+        id: item.id,
+        doctor: item.doctor_name,
+        specialty: item.doctor_specialty || "Specialty not specified",
+        date: item.date,
+        time: item.time,
+        location: item.location || "Main Clinic",
+        status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
+        type: item.type || "Consultation"
+      }));
+      
+      setAppointments(transformedData);
+    } catch (err: any) {
+      console.error('Error fetching appointments:', err);
+      setError('Failed to load appointments. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Convert appointments to calendar events
   const calendarEvents = appointments.map(appointment => ({
@@ -233,19 +257,50 @@ const PatientAppointments: React.FC = () => {
     setIsCancelModalOpen(true);
   };
 
-  const confirmCancelAppointment = () => {
-    // In a real app, this would make an API call
-    console.log(`Cancelling appointment ${appointmentToCancel}`);
-    setIsCancelModalOpen(false);
-    setAppointmentToCancel(null);
-    // Would then refresh appointments list
+  const confirmCancelAppointment = async () => {
+    if (!appointmentToCancel) return;
+    
+    try {
+      await appointmentService.cancelAppointment(appointmentToCancel);
+      
+      // Update the local state to reflect the cancellation
+      setAppointments(appointments.map(appointment => 
+        appointment.id === appointmentToCancel 
+          ? { ...appointment, status: 'Cancelled' }
+          : appointment
+      ));
+      
+      setIsCancelModalOpen(false);
+      setAppointmentToCancel(null);
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      // Show error to user
+      setError('Failed to cancel appointment. Please try again.');
+    }
   };
 
-  const handleScheduleAppointment = (data: AppointmentFormData) => {
-    // In a real app, this would make an API call
-    console.log('Scheduling appointment with data:', data);
-    setIsNewAppointmentOpen(false);
-    // Would then refresh appointments list
+  const handleScheduleAppointment = async (data: AppointmentFormData) => {
+    if (!user) return;
+    
+    try {
+      await appointmentService.createAppointment({
+        patientId: user.id,
+        doctorId: data.doctorId,
+        date: data.date,
+        time: data.time,
+        duration: 30, // Default duration in minutes
+        type: data.type,
+        notes: data.reason
+      });
+      
+      setIsNewAppointmentOpen(false);
+      
+      // Refresh appointments
+      fetchAppointments();
+    } catch (err) {
+      console.error('Error scheduling appointment:', err);
+      setError('Failed to schedule appointment. Please try again.');
+    }
   };
 
   const handleCalendarEventClick = (event: any) => {
@@ -273,6 +328,13 @@ const PatientAppointments: React.FC = () => {
         }
       />
 
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
       {/* Filters */}
       <FilterBar 
         activeFilter={filter}
@@ -283,39 +345,52 @@ const PatientAppointments: React.FC = () => {
         searchValue={searchQuery}
       />
 
-      {/* Calendar View */}
-      <Calendar 
-        events={calendarEvents}
-        onEventClick={handleCalendarEventClick}
-      />
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex justify-center p-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        <>
+          {/* Calendar View */}
+          <Calendar 
+            events={calendarEvents}
+            onEventClick={handleCalendarEventClick}
+          />
 
-      {/* Appointments List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredAppointments.length > 0 ? (
-          filteredAppointments.map((appointment) => (
-            <AppointmentCard 
-              key={appointment.id} 
-              appointment={appointment} 
-              onViewDetails={handleViewDetails}
-              onCancelAppointment={handleCancelAppointment}
-            />
-          ))
-        ) : (
-          <div className="col-span-1 lg:col-span-2 flex justify-center p-10">
-            <div className="text-center">
-              <p className="text-white/60">No appointments found matching your criteria.</p>
-              <Button 
-                variant="primary" 
-                size="md" 
-                className="mt-4"
-                onClick={() => setIsNewAppointmentOpen(true)}
-              >
-                Schedule New Appointment
-              </Button>
-            </div>
+          {/* Appointments List */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredAppointments.length > 0 ? (
+              filteredAppointments.map((appointment) => (
+                <AppointmentCard 
+                  key={appointment.id} 
+                  appointment={appointment} 
+                  onViewDetails={handleViewDetails}
+                  onCancelAppointment={handleCancelAppointment}
+                />
+              ))
+            ) : (
+              <div className="col-span-1 lg:col-span-2 flex justify-center p-10">
+                <div className="text-center">
+                  <p className="text-white/60">
+                    {loading 
+                      ? 'Loading appointments...' 
+                      : 'No appointments found matching your criteria.'}
+                  </p>
+                  <Button 
+                    variant="primary" 
+                    size="md" 
+                    className="mt-4"
+                    onClick={() => setIsNewAppointmentOpen(true)}
+                  >
+                    Schedule New Appointment
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* New Appointment Modal */}
       <Modal 

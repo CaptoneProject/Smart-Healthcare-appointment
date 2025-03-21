@@ -2,27 +2,26 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { 
   Hospital, 
   Layout, 
-  Calendar, 
-  FileText, 
-  Pill, 
-  CreditCard, 
+  UserCheck, 
+  Users, 
+  Settings, 
   Bell, 
   User,
-  LogOut 
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const PatientLayout = () => {
+const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   
   const navigationItems = [
-    { icon: Layout, label: 'Dashboard', path: '/p/dashboard' },
-    { icon: Calendar, label: 'Appointments', path: '/p/appointments' },
-    { icon: FileText, label: 'Medical Records', path: '/p/records' },
-    { icon: Pill, label: 'Prescriptions', path: '/p/prescriptions' },
-    { icon: CreditCard, label: 'Payments', path: '/p/payments' },
+    { icon: Layout, label: 'Dashboard', path: '/admin/dashboard' },
+    { icon: UserCheck, label: 'Doctor Approvals', path: '/admin/doctor-approvals' },
+    { icon: Users, label: 'User Management', path: '/admin/users' },
+    { icon: Settings, label: 'System Settings', path: '/admin/settings' },
   ];
 
   const handleLogout = async () => {
@@ -69,13 +68,10 @@ const PatientLayout = () => {
 
         {/* User Section */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
-          <Link
-            to="/p/profile"
-            className="flex items-center px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <User className="w-5 h-5 mr-3" />
-            {user ? user.name : 'Profile'}
-          </Link>
+          <div className="flex items-center px-4 py-3 rounded-lg text-gray-400">
+            <Shield className="w-5 h-5 mr-3 text-blue-500" />
+            <span>Admin Panel</span>
+          </div>
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
@@ -90,12 +86,15 @@ const PatientLayout = () => {
       <main className="ml-64 min-h-screen bg-slate-950 text-white">
         {/* Top Bar */}
         <header className="h-16 border-b border-white/10 bg-slate-900/50 backdrop-blur-lg px-8 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Dashboard</h1>
+          <h1 className="text-xl font-semibold">Admin Portal</h1>
           <div className="flex items-center space-x-4">
             <button className="p-2 text-gray-400 hover:text-white transition-colors relative">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
             </button>
+            <div className="text-sm text-white/70">
+              {user?.name}
+            </div>
           </div>
         </header>
 
@@ -108,4 +107,4 @@ const PatientLayout = () => {
   );
 };
 
-export default PatientLayout;
+export default AdminLayout;

@@ -1,7 +1,8 @@
 // src/components/forms/AppointmentForm.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, User, FileText } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { doctorService } from '../../services/api';
 
 interface Doctor {
   id: number;
@@ -41,13 +42,20 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({
 
   const [errors, setErrors] = useState<Partial<Record<keyof AppointmentFormData, string>>>({});
 
-  // Mock data - in a real app would come from API
-  const doctors: Doctor[] = [
-    { id: 1, name: 'Dr. Sarah Wilson', specialty: 'General Physician' },
-    { id: 2, name: 'Dr. Michael Chen', specialty: 'Cardiologist' },
-    { id: 3, name: 'Dr. Emily Rodriguez', specialty: 'Dermatologist' },
-    { id: 4, name: 'Dr. James Smith', specialty: 'Orthopedic Surgeon' }
-  ];
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const data = await doctorService.getDoctors();
+        setDoctors(data);
+      } catch (error) {
+        console.error('Error fetching doctors:', error);
+      }
+    };
+    
+    fetchDoctors();
+  }, []);
 
   const appointmentTypes = [
     'Consultation', 

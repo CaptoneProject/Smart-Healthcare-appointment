@@ -1,6 +1,6 @@
 import React from 'react';
 
-type StatusType = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'Active' | 'Expired' | 'Refill Requested' | 'Overdue' | 'Paid';
+export type StatusType = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'Active' | 'Expired' | 'Refill Requested' | 'Overdue' | 'Paid';
 
 interface StatusBadgeProps {
   status: StatusType;
