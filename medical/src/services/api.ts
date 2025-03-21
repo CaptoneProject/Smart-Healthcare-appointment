@@ -239,8 +239,15 @@ export const doctorService = {
   submitCredentials: async (data: any) => {
     try {
       const response = await api.post('/doctor/credentials', data);
+      
+      // Update the stored user data with pending status
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      userData.doctorStatus = 'pending';
+      localStorage.setItem('user', JSON.stringify(userData));
+      
       return response.data;
     } catch (error) {
+      console.error('Error submitting credentials:', error);
       throw error;
     }
   },

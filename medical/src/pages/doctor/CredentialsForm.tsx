@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { doctorService } from '../../services/api';
+import { User } from '../../types/user';
 
 interface CredentialsFormData {
   degree: string;
@@ -43,7 +44,7 @@ const DoctorCredentialsForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -64,24 +65,13 @@ const DoctorCredentialsForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Basic validation
+    // Validate form data
     const newErrors: Partial<Record<keyof CredentialsFormData, string>> = {};
     
-    if (!formData.degree) {
-      newErrors.degree = 'Degree is required';
-    }
-    
-    if (!formData.licenseNumber) {
-      newErrors.licenseNumber = 'License number is required';
-    }
-    
-    if (!formData.specialization) {
-      newErrors.specialization = 'Specialization is required';
-    }
-    
-    if (!formData.yearsOfExperience) {
-      newErrors.yearsOfExperience = 'Years of experience is required';
-    }
+    if (!formData.degree) newErrors.degree = 'Degree is required';
+    if (!formData.licenseNumber) newErrors.licenseNumber = 'License number is required';
+    if (!formData.specialization) newErrors.specialization = 'Specialization is required';
+    if (!formData.yearsOfExperience) newErrors.yearsOfExperience = 'Years of experience is required';
     
     setErrors(newErrors);
     
@@ -92,12 +82,22 @@ const DoctorCredentialsForm: React.FC = () => {
           doctorId: user?.id,
           ...formData
         });
+
+        if (user) {
+          const updatedUser: User = {
+            ...user,
+            doctorStatus: 'pending' as const 
+          };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+        }
+
+        setSubmitMessage('Credentials submitted successfully. Redirecting to pending approval page...');
         
-        setSubmitMessage('Your credentials have been submitted for verification. You will be notified once approved.');
-        
-        // Navigate to pending approval page immediately
-        navigate('/d/pending-approval', { replace: true });
-        
+        setTimeout(() => {
+          navigate('/d/pending-approval', { replace: true });
+        }, 1500);
+
       } catch (error) {
         console.error('Error submitting credentials:', error);
         setSubmitMessage('Failed to submit credentials. Please try again.');

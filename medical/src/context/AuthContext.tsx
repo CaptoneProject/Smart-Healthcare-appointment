@@ -1,19 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { adminService, authService } from '../services/api';
+import { adminService, authService, doctorService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-// Add this import
-import { doctorService } from '../services/api';
-
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  userType: 'patient' | 'doctor' | 'admin';
-  doctorStatus?: 'pending' | 'approved' | 'rejected'; // Add this line
-}
+import { User } from '../types/user';
 
 interface AuthContextType {
   user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -30,7 +22,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Add this function to check for credentials status
   const checkDoctorCredentials = async (userId: number) => {
     try {
       const response = await doctorService.getCredentialsStatus(userId);
@@ -41,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check for existing auth token and get user data on mount
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -56,7 +46,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err) {
         console.error('Failed to load user', err);
         
-        // Try to refresh token if initial load fails
         try {
           await authService.refreshToken();
           const userData = await authService.getProfile();
@@ -74,7 +63,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUser();
   }, []);
 
-  // Update your login function to handle rejected doctors
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
@@ -82,12 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await authService.login(email, password);
       
-      // Store auth data first
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
 
-      // Handle routing based on user type and status
       if (response.user.userType === 'doctor') {
         if (response.user.doctorStatus === 'rejected') {
           setLoading(false);
@@ -108,7 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Handle other user types
       setLoading(false);
       if (response.user.userType === 'patient') {
         navigate('/p/dashboard', { replace: true });
@@ -120,10 +105,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     } catch (err: any) {
       console.error('Login error:', err);
-      // Set the error without navigating
       setError(err.message || 'Invalid email or password');
       setLoading(false);
-      // Don't return null, instead throw the error to be handled by the login form
       throw err;
     }
   };
@@ -136,7 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.register(userData);
       setUser(response.user);
       
-      // Redirect based on user type
       if (response.user.userType === 'patient') {
         navigate('/p/dashboard');
       } else if (response.user.userType === 'doctor') {
@@ -166,7 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigate('/');
     } catch (err) {
       console.error('Logout error', err);
-      // Still clear user state even if API call fails
       setUser(null);
       navigate('/');
     } finally {
@@ -181,7 +162,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authService.updateProfile(profileData);
       
-      // Refresh user data if profile was updated
       const userData = await authService.getProfile();
       setUser(userData);
     } catch (err: any) {
@@ -196,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        setUser,
         loading,
         error,
         login,
