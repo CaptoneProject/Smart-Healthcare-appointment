@@ -13,64 +13,90 @@ const pool = new Pool({
 
 // Initialize tables
 const initTables = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS doctor_schedules (
-      id SERIAL PRIMARY KEY,
-      doctor_id INTEGER REFERENCES users(id),
-      day_of_week INTEGER, -- 0-6 (Sunday-Saturday)
-      start_time TIME,
-      end_time TIME,
-      break_start TIME,
-      break_end TIME,
-      max_patients INTEGER,
-      is_available BOOLEAN DEFAULT true,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+  try {
+    // First check if the table exists with the old structure
+    const tableCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'doctor_schedules' 
+      AND column_name = 'break_start'
+    `);
+    
+    // If the break_start column doesn't exist, drop and recreate the table
+    if (tableCheck.rows.length === 0) {
+      console.log('Recreating doctor_schedules table with updated structure...');
+      
+      // Drop the old table if it exists (cascade to handle references)
+      await pool.query(`DROP TABLE IF EXISTS doctor_schedules CASCADE`);
+      
+      // Create the table with the correct structure
+      await pool.query(`
+        CREATE TABLE doctor_schedules (
+          id SERIAL PRIMARY KEY,
+          doctor_id INTEGER REFERENCES users(id),
+          day_of_week INTEGER, -- 0-6 (Sunday-Saturday)
+          start_time TIME,
+          end_time TIME,
+          break_start TIME,
+          break_end TIME,
+          max_patients INTEGER DEFAULT 4,
+          is_available BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      console.log('Table doctor_schedules recreated successfully.');
+    }
+    
+    // Continue with other table creation...
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS patient_visits (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES users(id),
+        doctor_id INTEGER REFERENCES users(id),
+        appointment_id INTEGER REFERENCES appointments(id),
+        visit_date DATE,
+        visit_time TIME,
+        status VARCHAR(50),
+        symptoms TEXT,
+        diagnosis TEXT,
+        prescription TEXT,
+        notes TEXT,
+        follow_up_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS patient_visits (
-      id SERIAL PRIMARY KEY,
-      patient_id INTEGER REFERENCES users(id),
-      doctor_id INTEGER REFERENCES users(id),
-      appointment_id INTEGER REFERENCES appointments(id),
-      visit_date DATE,
-      visit_time TIME,
-      status VARCHAR(50),
-      symptoms TEXT,
-      diagnosis TEXT,
-      prescription TEXT,
-      notes TEXT,
-      follow_up_date DATE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+      CREATE TABLE IF NOT EXISTS doctor_leaves (
+        id SERIAL PRIMARY KEY,
+        doctor_id INTEGER REFERENCES users(id),
+        start_date DATE,
+        end_date DATE,
+        leave_type VARCHAR(50),
+        reason TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS doctor_leaves (
-      id SERIAL PRIMARY KEY,
-      doctor_id INTEGER REFERENCES users(id),
-      start_date DATE,
-      end_date DATE,
-      leave_type VARCHAR(50),
-      reason TEXT,
-      status VARCHAR(20) DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS doctor_credentials (
-      id SERIAL PRIMARY KEY,
-      doctor_id INTEGER REFERENCES users(id) UNIQUE,
-      degree VARCHAR(100),
-      license_number VARCHAR(100),
-      specialization VARCHAR(100),
-      subspecialization VARCHAR(100),
-      years_of_experience INTEGER,
-      biography TEXT,
-      education_history TEXT,
-      verification_status VARCHAR(20) DEFAULT 'pending',
-      verified_by INTEGER,
-      verification_notes TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS doctor_credentials (
+        id SERIAL PRIMARY KEY,
+        doctor_id INTEGER REFERENCES users(id) UNIQUE,
+        degree VARCHAR(100),
+        license_number VARCHAR(100),
+        specialization VARCHAR(100),
+        subspecialization VARCHAR(100),
+        years_of_experience INTEGER,
+        biography TEXT,
+        education_history TEXT,
+        verification_status VARCHAR(20) DEFAULT 'pending',
+        verified_by INTEGER,
+        verification_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (error) {
+    console.error('Error initializing tables:', error);
+  }
 };
 
 initTables();
@@ -113,6 +139,21 @@ router.post('/doctors/schedule', async (req, res) => {
 
 // Get doctor's schedule
 router.get('/doctors/:id/schedule', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM doctor_schedules WHERE doctor_id = $1 ORDER BY day_of_week',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get doctor's schedule
+router.get('/schedule/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -380,6 +421,111 @@ router.get('/status/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Error checking doctor status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add schedule slot
+router.post('/schedule-slots', async (req, res) => {
+  try {
+    const {
+      doctorId,
+      dayOfWeek,
+      startTime,
+      endTime,
+      breakStart,
+      breakEnd,
+      maxPatients
+    } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO doctor_schedules 
+       (doctor_id, day_of_week, start_time, end_time, break_start, break_end, max_patients)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        doctorId,
+        dayOfWeek,
+        startTime,
+        endTime,
+        breakStart || null,
+        breakEnd || null,
+        maxPatients || 4
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error adding schedule slot:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update schedule slot
+router.put('/schedule-slots/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      doctorId,
+      dayOfWeek,
+      startTime,
+      endTime,
+      breakStart,
+      breakEnd,
+      maxPatients
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE doctor_schedules 
+       SET day_of_week = $1, 
+           start_time = $2, 
+           end_time = $3, 
+           break_start = $4, 
+           break_end = $5, 
+           max_patients = $6
+       WHERE id = $7 AND doctor_id = $8
+       RETURNING *`,
+      [
+        dayOfWeek,
+        startTime,
+        endTime,
+        breakStart || null,
+        breakEnd || null,
+        maxPatients || 4,
+        id,
+        doctorId
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Schedule slot not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating schedule slot:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete schedule slot
+router.delete('/schedule-slots/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { doctorId } = req.query;
+
+    const result = await pool.query(
+      'DELETE FROM doctor_schedules WHERE id = $1 AND doctor_id = $2 RETURNING *',
+      [id, doctorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Schedule slot not found' });
+    }
+
+    res.json({ message: 'Schedule slot deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting schedule slot:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -36,7 +36,9 @@ const DoctorSchedule: React.FC = () => {
       try {
         setIsLoading(true);
         const data = await doctorService.getSchedule(user.id);
-        setSchedule(data);
+        // Normalize the data from the API
+        const normalizedData = Array.isArray(data) ? data.map(normalizeSlotData) : [];
+        setSchedule(normalizedData);
       } catch (err) {
         console.error('Error fetching schedule:', err);
         setError('Failed to load your schedule. Please try again.');
@@ -82,18 +84,28 @@ const DoctorSchedule: React.FC = () => {
     if (!selectedSlot || !user?.id) return;
     
     try {
+      console.log('Submitting slot:', selectedSlot);
+      
       if (selectedSlot.id) {
         // Update existing slot
-        await doctorService.updateScheduleSlot(user.id, selectedSlot);
-        setSchedule(schedule.map(slot => 
-          slot.id === selectedSlot.id ? selectedSlot : slot
-        ));
+        const updatedSlot = await doctorService.updateScheduleSlot(user.id, selectedSlot);
+        console.log('Slot updated:', updatedSlot);
+        
+        setSchedule(prevSchedule => 
+          prevSchedule.map(slot => 
+            slot.id === selectedSlot.id ? normalizeSlotData(updatedSlot) : slot
+          )
+        );
       } else {
         // Add new slot
         const newSlot = await doctorService.addScheduleSlot(user.id, selectedSlot);
-        setSchedule([...schedule, newSlot]);
+        console.log('New slot added:', newSlot);
+        
+        setSchedule(prevSchedule => [...prevSchedule, normalizeSlotData(newSlot)]);
       }
+      
       setIsModalOpen(false);
+      setSelectedSlot(null);
     } catch (err) {
       console.error('Error saving schedule slot:', err);
       setError('Failed to save time slot. Please try again.');
@@ -102,12 +114,33 @@ const DoctorSchedule: React.FC = () => {
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    console.log(`Field changed: ${name} = ${value}`); // Add logging
+    
     if (!selectedSlot) return;
     
-    setSelectedSlot({
-      ...selectedSlot,
-      [name]: name === 'dayOfWeek' || name === 'maxPatients' ? parseInt(value) : value
-    });
+    // Force re-render by creating a completely new object
+    const updatedSlot = { ...selectedSlot };
+    
+    if (name === 'dayOfWeek' || name === 'maxPatients') {
+      (updatedSlot as any)[name] = parseInt(value, 10);
+    } else {
+      (updatedSlot as any)[name] = value;
+    }
+    
+    console.log('Updated slot:', updatedSlot); // Log the new slot object
+    setSelectedSlot(updatedSlot);
+  };
+
+  const normalizeSlotData = (slotData: any): TimeSlot => {
+    return {
+      id: slotData.id,
+      dayOfWeek: slotData.day_of_week,
+      startTime: slotData.start_time.substring(0, 5), // Handle "09:00:00" format
+      endTime: slotData.end_time.substring(0, 5),
+      breakStart: slotData.break_start ? slotData.break_start.substring(0, 5) : undefined,
+      breakEnd: slotData.break_end ? slotData.break_end.substring(0, 5) : undefined,
+      maxPatients: slotData.max_patients
+    };
   };
   
   return (
@@ -241,6 +274,7 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.startTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+                // Remove step to avoid potential browser issues
               />
             </div>
             
@@ -252,6 +286,7 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.endTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+                step="300" // 5-minute increments
               />
             </div>
           </div>
@@ -265,6 +300,7 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakStart || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+                step="300" // 5-minute increments
               />
             </div>
             
@@ -276,6 +312,7 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakEnd || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+                step="300" // 5-minute increments
               />
             </div>
           </div>
@@ -293,6 +330,10 @@ const DoctorSchedule: React.FC = () => {
               onChange={handleChange}
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
             />
+          </div>
+          
+          <div className="flex justify-end">
+            <small className="text-white/40">Time format: HH:MM (12-hour)</small>
           </div>
           
           <div className="pt-4 border-t border-white/10 flex justify-end space-x-2">

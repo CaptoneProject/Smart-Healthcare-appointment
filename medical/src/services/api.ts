@@ -169,9 +169,11 @@ export const doctorService = {
   
   getSchedule: async (doctorId: number) => {
     try {
-      const response = await api.get(`/doctors/${doctorId}/schedule`);
+      // Use the correct endpoint
+      const response = await api.get(`/doctor/schedule/${doctorId}`);
       return response.data;
     } catch (error) {
+      console.error('Error fetching schedule:', error);
       throw error;
     }
   },
@@ -254,12 +256,19 @@ export const doctorService = {
   
   addScheduleSlot: async (doctorId: number, slotData: any) => {
     try {
-      const response = await api.post(`/doctor/schedule-slots`, {
+      // Log the data being sent
+      console.log('Adding schedule slot:', { doctorId, ...slotData });
+      
+      const response = await api.post('/doctor/schedule-slots', {
         doctorId,
         ...slotData
       });
+      
+      // Log the response
+      console.log('Schedule slot added:', response.data);
       return response.data;
     } catch (error) {
+      console.error('Error adding schedule slot:', error);
       throw error;
     }
   },
@@ -272,15 +281,19 @@ export const doctorService = {
       });
       return response.data;
     } catch (error) {
+      console.error('Error updating schedule slot:', error);
       throw error;
     }
   },
   
   deleteScheduleSlot: async (doctorId: number, slotId: number) => {
     try {
-      const response = await api.delete(`/doctor/schedule-slots/${slotId}?doctorId=${doctorId}`);
+      const response = await api.delete(`/doctor/schedule-slots/${slotId}`, {
+        params: { doctorId }
+      });
       return response.data;
     } catch (error) {
+      console.error('Error deleting schedule slot:', error);
       throw error;
     }
   },

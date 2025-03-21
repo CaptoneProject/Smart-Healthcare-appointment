@@ -148,9 +148,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
         window.location.href = '/admin/dashboard';
         return;
       } else if (userType === 'doctor') {
-        loginResponse = await login('doctor@smartcare.com', 'doctor123');
+        loginResponse = await login('doctor3@gmail.com', 'doctor3');
       } else {
-        loginResponse = await login('patient@smartcare.com', 'patient123');
+        loginResponse = await login('testuser1@gmail.com', 'testuser1');
       }
 
       // Check localStorage for token

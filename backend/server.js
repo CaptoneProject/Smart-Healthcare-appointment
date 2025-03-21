@@ -258,7 +258,7 @@ const adminRoutes = require('./adminRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/doctor', doctorSchedulingRoutes);
-app.use('/api/notifications', notificationsRoutes);
+app.use('/api/notifications', notificationsRoutes); 
 app.use('/api/admin', authenticateToken, adminRoutes);
 
 // Start server
