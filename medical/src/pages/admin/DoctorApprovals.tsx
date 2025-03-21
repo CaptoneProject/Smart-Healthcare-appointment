@@ -46,11 +46,14 @@ const DoctorApprovals: React.FC = () => {
     const fetchCredentials = async () => {
       try {
         setLoading(true);
+        console.log('Fetching doctor credentials with filter:', activeTab);
         const data = await adminService.getDoctorCredentials(activeTab);
+        console.log('Received data:', data);
         setPendingCredentials(data);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching doctor credentials:', err);
-        setError('Failed to load doctor credentials. Please try again.');
+        // Provide a more detailed error message
+        setError(`Failed to load doctor credentials. ${err.message || 'Please try again.'}`);
       } finally {
         setLoading(false);
       }
@@ -100,6 +103,12 @@ const DoctorApprovals: React.FC = () => {
     setSelectedDoctor(doctor);
     setRejectionReason('');
     setIsRejectionModalOpen(true);
+  };
+
+  // Update the openConfirmationModal function to also set the selected doctor
+  const openConfirmationModal = (doctor: DoctorCredential) => {
+    setSelectedDoctor(doctor);
+    setIsConfirmingApproval(true);
   };
   
   const handleReject = async () => {
@@ -208,53 +217,22 @@ const DoctorApprovals: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="flex space-x-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Eye className="w-4 h-4" />}
-                    onClick={() => handleViewDetails(doctor)}
-                  >
-                    View Details
-                  </Button>
-                  
-                  {doctor.status === 'pending' && (
-                    <>
-                      <Button 
-                        variant="primary"
-                        icon={isApproving ? null : <CheckCircle className="w-4 h-4" />}
-                        onClick={() => setIsConfirmingApproval(true)}
-                        disabled={isApproving}
-                      >
-                        {isApproving ? (
-                          <>
-                            <span className="animate-spin mr-2">⏳</span>
-                            Approving...
-                          </>
-                        ) : (
-                          'Approve'
-                        )}
-                      </Button>
-                      
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        icon={<XCircle className="w-4 h-4" />}
-                        onClick={() => openRejectionModal(doctor)}
-                      >
-                        Reject
-                      </Button>
-                    </>
-                  )}
-                  
-                  {doctor.status === 'approved' && (
+                <div className="flex items-center space-x-2">
+                  {doctor.status === 'pending' ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Eye className="w-4 h-4" />}
+                      onClick={() => handleViewDetails(doctor)}
+                    >
+                      Review Application
+                    </Button>
+                  ) : doctor.status === 'approved' ? (
                     <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs flex items-center">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Approved
                     </span>
-                  )}
-                  
-                  {doctor.status === 'rejected' && (
+                  ) : (
                     <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs flex items-center">
                       <XCircle className="w-3 h-3 mr-1" />
                       Rejected
@@ -347,40 +325,49 @@ const DoctorApprovals: React.FC = () => {
             </div>
             
             {selectedDoctor.status === 'pending' && (
-              <div className="pt-4 border-t border-white/10 flex justify-end space-x-3">
-                <Button 
-                  variant="secondary"
-                  onClick={() => setIsDetailsOpen(false)}
-                >
-                  Cancel
-                </Button>
-                
-                <Button 
-                  variant="danger"
-                  icon={<XCircle className="w-4 h-4" />}
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    openRejectionModal(selectedDoctor);
-                  }}
-                >
-                  Reject
-                </Button>
-                
-                <Button 
-                  variant="primary"
-                  icon={isApproving ? null : <CheckCircle className="w-4 h-4" />}
-                  onClick={() => setIsConfirmingApproval(true)}
-                  disabled={isApproving}
-                >
-                  {isApproving ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Approving...
-                    </>
-                  ) : (
-                    'Approve'
-                  )}
-                </Button>
+              <div className="pt-6 border-t border-white/10">
+                <div className="bg-slate-800/50 p-4 rounded-lg mb-4">
+                  <h3 className="text-white/90 font-medium mb-2">Application Decision</h3>
+                  <p className="text-white/60 text-sm mb-4">
+                    Please review the application details carefully before making a decision.
+                  </p>
+                  
+                  <div className="flex justify-end space-x-3">
+                    <Button 
+                      variant="secondary"
+                      onClick={() => setIsDetailsOpen(false)}
+                    >
+                      Close
+                    </Button>
+                    
+                    <Button 
+                      variant="danger"
+                      icon={<XCircle className="w-4 h-4" />}
+                      onClick={() => {
+                        setIsDetailsOpen(false);
+                        openRejectionModal(selectedDoctor);
+                      }}
+                    >
+                      Reject
+                    </Button>
+                    
+                    <Button 
+                      variant="primary"
+                      icon={isApproving ? null : <CheckCircle className="w-4 h-4" />}
+                      onClick={() => setIsConfirmingApproval(true)}
+                      disabled={isApproving}
+                    >
+                      {isApproving ? (
+                        <>
+                          <span className="animate-spin mr-2">⏳</span>
+                          Approving...
+                        </>
+                      ) : (
+                        'Approve'
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -459,7 +446,11 @@ const DoctorApprovals: React.FC = () => {
               icon={<CheckCircle className="w-4 h-4" />}
               onClick={() => {
                 setIsConfirmingApproval(false);
-                handleApprove(selectedDoctor!.doctorId);
+                if (selectedDoctor) {
+                  handleApprove(selectedDoctor.doctorId);
+                } else {
+                  console.error('No doctor selected for approval');
+                }
               }}
             >
               Confirm Approval

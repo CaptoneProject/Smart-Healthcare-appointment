@@ -13,7 +13,7 @@ interface FormData {
   email: string;
   password: string;
   name: string;
-  userType: 'patient' | 'doctor' | 'provider';
+  userType: 'patient' | 'doctor' | 'provider' | 'admin';  // Added 'admin'
   confirmPassword: string;
 }
 
@@ -86,17 +86,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
-    
-    if (!validateForm()) {
-      return;
-    }
+    setFormError('');
     
     try {
       if (isSignIn) {
         await login(formData.email, formData.password);
+        // Successful login will navigate automatically
       } else {
         await register({
           email: formData.email,
@@ -108,7 +105,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       onClose();
     } catch (err: any) {
       console.error('Auth error:', err);
-      setFormError(err.message || 'An error occurred during authentication');
+      // Stay on form and display error
+      setFormError(err.message || 'Authentication failed');
     }
   };
 
@@ -137,11 +135,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   // Quick navigation function for development
   const handleQuickNavigation = async (userType: 'patient' | 'doctor' | 'admin') => {
     try {
+      console.log(`Attempting quick navigation for ${userType}...`);
+      
       // Call your auth service to simulate login with the specific user type
       let loginResponse;
       if (userType === 'admin') {
-        loginResponse = await login('admin@smartcare.com', 'admin123');
+        console.log('Logging in as admin...');
+        loginResponse = await login('admin@gmail.com', 'admin1');
         console.log('Admin login response:', loginResponse);
+        
+        // Force navigation to avoid any middleware issues
+        window.location.href = '/admin/dashboard';
+        return;
       } else if (userType === 'doctor') {
         loginResponse = await login('doctor@smartcare.com', 'doctor123');
       } else {
@@ -151,11 +156,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       // Check localStorage for token
       const token = localStorage.getItem('accessToken');
       console.log('Token after login:', token ? 'Token exists' : 'No token');
+      const user = localStorage.getItem('user');
+      console.log('User from localStorage:', user);
 
-      // Then navigate
+      // Normal navigation via React Router
       const route = userType === 'patient' ? '/p/dashboard' : 
-                   userType === 'doctor' ? '/d/dashboard' : 
-                   '/admin/dashboard';
+                    userType === 'doctor' ? '/d/dashboard' : 
+                    '/admin/dashboard';
+      console.log(`Navigating to ${route}`);
       navigate(route);
       onClose();
     } catch (error) {
@@ -229,7 +237,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 <div>
                   <label className="block text-sm font-medium mb-2 text-white">I am a</label>
                   <div className="grid grid-cols-3 gap-3">
-                    {(['patient', 'doctor', 'provider'] as const).map((type) => (
+                    {(['patient', 'doctor', 'admin'] as const).map((type) => (
                       <button
                         key={type}
                         type="button"
@@ -240,7 +248,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                             : 'border-white/20 bg-white/10 hover:bg-white/20 text-white'
                         } transition-all capitalize text-sm`}
                       >
-                        {type === 'provider' ? 'Healthcare Provider' : type}
+                        {type}
                       </button>
                     ))}
                   </div>

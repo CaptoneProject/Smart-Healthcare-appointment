@@ -24,7 +24,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Validate user type
-    const validUserTypes = ['patient', 'doctor', 'provider'];
+    const validUserTypes = ['patient', 'doctor', 'provider', 'admin'];
     if (!validUserTypes.includes(userType)) {
       return res.status(400).json({ error: 'Invalid user type' });
     }
@@ -77,48 +77,52 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
+    
     // Find user
-    const result = await pool.query(
-      'SELECT id, email, password, name, user_type FROM users WHERE email = $1',
+    const userResult = await pool.query(
+      'SELECT id, email, name, password, user_type FROM users WHERE email = $1',
       [email]
     );
 
-    const user = result.rows[0];
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    const user = userResult.rows[0];
+    
     // Verify password
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // For doctors, check their status
+    let doctorStatus = null;
+    if (user.user_type === 'doctor') {
+      const statusCheck = await pool.query(
+        'SELECT verification_status FROM doctor_credentials WHERE doctor_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [user.id]
+      );
+      
+      if (statusCheck.rows.length > 0) {
+        doctorStatus = statusCheck.rows[0].verification_status;
+      }
+    }
+    
+    // Generate tokens
     const tokens = generateTokens(user);
-
-    // Store refresh token
-    await pool.query(
-      'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
-      [user.id, tokens.refreshToken]
-    );
-
+    
+    // Return user data with status
     res.json({
-      message: 'Login successful',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        userType: user.user_type
-      },
-      ...tokens
+        userType: user.user_type,
+        ...(user.user_type === 'doctor' && { doctorStatus: doctorStatus || 'pending' })
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -128,15 +132,23 @@ router.post('/login', async (req, res) => {
 
 // Helper function to generate tokens
 const generateTokens = (user) => {
+  if (!process.env.JWT_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
+    throw new Error('JWT secrets not configured');
+  }
+
   const accessToken = jwt.sign(
-    { userId: user.id, email: user.email, userType: user.user_type },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '1h' }
+    { 
+      userId: user.id, 
+      email: user.email, 
+      userType: user.user_type 
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }  // Extended from 1h to 24h
   );
 
   const refreshToken = jwt.sign(
     { userId: user.id },
-    process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret',
+    process.env.REFRESH_TOKEN_SECRET,
     { expiresIn: '7d' }
   );
 

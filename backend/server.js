@@ -58,20 +58,28 @@ initDatabase();
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
     }
-    req.user = user;
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT secret not configured');
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
-  });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    return res.status(403).json({ error: 'Invalid token' });
+  }
 };
 
 // Generate JWT tokens function (still needed for refresh token endpoint)
@@ -248,7 +256,7 @@ const adminRoutes = require('./adminRoutes');
 
 // Use routers
 app.use('/api/auth', authRoutes);
-app.use('/api/appointments', appointmentsRoutes); // Fix this path to match frontend calls
+app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/doctor', doctorSchedulingRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);

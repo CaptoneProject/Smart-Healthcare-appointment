@@ -88,7 +88,6 @@ const DoctorCredentialsForm: React.FC = () => {
     if (Object.keys(newErrors).length === 0) {
       setIsSubmitting(true);
       try {
-        // Submit the doctor's credentials for verification
         await doctorService.submitCredentials({
           doctorId: user?.id,
           ...formData
@@ -96,11 +95,8 @@ const DoctorCredentialsForm: React.FC = () => {
         
         setSubmitMessage('Your credentials have been submitted for verification. You will be notified once approved.');
         
-        // In a real app, you might redirect or show a success screen
-        // For now, we'll navigate to the dashboard with a pending status
-        setTimeout(() => {
-          navigate('/d/dashboard');
-        }, 3000);
+        // Navigate to pending approval page immediately
+        navigate('/d/pending-approval', { replace: true });
         
       } catch (error) {
         console.error('Error submitting credentials:', error);

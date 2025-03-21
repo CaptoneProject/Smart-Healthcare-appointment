@@ -13,9 +13,13 @@ const pool = new Pool({
 
 // Middleware to check if user is admin
 const isAdmin = (req, res, next) => {
+  console.log('Checking admin privileges for:', req.user);
+  
   if (req.user && req.user.userType === 'admin') {
+    console.log('User has admin privileges, proceeding...');
     next();
   } else {
+    console.log('Access denied, user is not admin:', req.user);
     res.status(403).json({ error: 'Access denied. Admin privileges required.' });
   }
 };
@@ -56,44 +60,36 @@ router.get('/doctor-credentials', isAdmin, async (req, res) => {
   }
 });
 
-// Update doctor credentials status
-router.put('/doctor-credentials/:id', isAdmin, async (req, res) => {
+// Update doctor status (approve/reject)
+router.put('/doctor-credentials/status/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reason } = req.body;
+    const { status } = req.body;
     
-    // Validate status
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
     
-    // Update status
-    await pool.query(
-      `UPDATE doctor_credentials 
-       SET verification_status = $1, 
-           verification_notes = $2,
-           verified_by = $3,
-           updated_at = NOW()
-       WHERE doctor_id = $4`,
-      [status, reason || null, req.user.userId, id]
-    );
+    // Fix: Update query to use doctor_id instead of id
+    const updateQuery = `
+      UPDATE doctor_credentials 
+      SET verification_status = $1, 
+          updated_at = NOW() 
+      WHERE doctor_id = $2 
+      RETURNING *`;
     
-    // Get doctor's email
-    const userResult = await pool.query(
-      'SELECT email FROM users WHERE id = $1',
-      [id]
-    );
+    const updateResult = await pool.query(updateQuery, [status, id]);
     
-    if (userResult.rows.length > 0) {
-      const doctorEmail = userResult.rows[0].email;
-      
-      // In a real app, you'd send an email notification here
-      console.log(`Notification to ${doctorEmail}: Your credentials have been ${status}${reason ? '. Reason: ' + reason : ''}`);
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Doctor credentials not found' });
     }
     
-    res.json({ message: `Doctor credentials ${status} successfully` });
+    res.json({
+      message: `Doctor ${status === 'approved' ? 'approved' : 'rejected'} successfully`,
+      credentials: updateResult.rows[0]
+    });
   } catch (error) {
-    console.error('Error updating doctor credentials:', error);
+    console.error(`Error updating doctor status:`, error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -356,4 +356,32 @@ router.get('/credentials-status/:id', async (req, res) => {
   }
 });
 
+// Add this route to your doctor routes
+router.get('/status/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      `SELECT verification_status as status
+       FROM doctor_credentials 
+       WHERE doctor_id = $1 
+       ORDER BY updated_at DESC 
+       LIMIT 1`,
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.json({ status: 'pending' });
+    }
+    
+    res.json({
+      status: result.rows[0].status,
+      hasSubmittedCredentials: true
+    });
+  } catch (error) {
+    console.error('Error checking doctor status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

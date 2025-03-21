@@ -8,7 +8,7 @@ import {
   User,
   LucideIcon
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -85,7 +85,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <h3 className="font-medium text-lg text-white/90">{patientName}</h3>
         <p className="text-white/60">{type}</p>
       </div>
-      <StatusBadge status={status} />
+      <StatusBadge status={status as any} />
     </div>
     
     <div className="space-y-3">
@@ -136,6 +136,8 @@ const DoctorDashboard: React.FC = () => {
     newPatients: 0,
     pendingReports: 0
   });
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -278,16 +280,16 @@ const DoctorDashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white/90">Today's Appointments</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<ArrowRight className="w-4 h-4" />}
-            onClick={() => {}}
-            as={Link}
-            to="/d/appointments"
-          >
-            View all
-          </Button>
+          <Link to="/d/appointments">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<ArrowRight className="w-4 h-4" />}
+              onClick={() => {}}
+            >
+              View all
+            </Button>
+          </Link>
         </div>
         {todayAppointments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

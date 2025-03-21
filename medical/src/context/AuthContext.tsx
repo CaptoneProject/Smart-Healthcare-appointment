@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { authService } from '../services/api';
+import { adminService, authService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 // Add this import
 import { doctorService } from '../services/api';
@@ -8,7 +8,8 @@ interface User {
   id: number;
   email: string;
   name: string;
-  userType: 'patient' | 'doctor' | 'provider';
+  userType: 'patient' | 'doctor' | 'admin';
+  doctorStatus?: 'pending' | 'approved' | 'rejected'; // Add this line
 }
 
 interface AuthContextType {
@@ -73,32 +74,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUser();
   }, []);
 
+  // Update your login function to handle rejected doctors
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
       const response = await authService.login(email, password);
-      setUser(response.user);
       
-      // Redirect based on user type
-      if (response.user.userType === 'patient') {
-        navigate('/p/dashboard');
-      } else if (response.user.userType === 'doctor') {
-        const hasCredentials = await checkDoctorCredentials(response.user.id);
-        if (!hasCredentials) {
-          navigate('/d/credentials');
+      // Store auth data first
+      localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user);
+
+      // Handle routing based on user type and status
+      if (response.user.userType === 'doctor') {
+        if (response.user.doctorStatus === 'rejected') {
+          setLoading(false);
+          navigate('/d/rejected', { replace: true });
+          return;
+        } else if (response.user.doctorStatus === 'pending') {
+          setLoading(false);
+          navigate('/d/pending-approval', { replace: true });
+          return;
+        } else if (response.user.doctorStatus === 'approved') {
+          setLoading(false);
+          navigate('/d/dashboard', { replace: true });
+          return;
+        } else {
+          setLoading(false);
+          navigate('/d/credentials', { replace: true });
           return;
         }
-        navigate('/d/dashboard');
-      } else if (response.user.userType === 'provider') {
-        navigate('/provider/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
-      throw err;
-    } finally {
+
+      // Handle other user types
       setLoading(false);
+      if (response.user.userType === 'patient') {
+        navigate('/p/dashboard', { replace: true });
+      } else if (response.user.userType === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      }
+
+      return response;
+
+    } catch (err: any) {
+      console.error('Login error:', err);
+      // Set the error without navigating
+      setError(err.message || 'Invalid email or password');
+      setLoading(false);
+      // Don't return null, instead throw the error to be handled by the login form
+      throw err;
     }
   };
 

@@ -18,62 +18,65 @@ import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import DoctorApprovals from './pages/admin/DoctorApprovals';
 import ErrorBoundary from './components/ErrorBoundary';
+import AccountRejected from './pages/doctor/AccountRejected';
 
-// Complete the ProtectedRoute implementation
+// Update the ProtectedRoute to handle admin routes with better logging
 const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [checkingCredentials, setCheckingCredentials] = useState(false);
   
   useEffect(() => {
-    const checkCredentials = async () => {
-      if (user && user.userType === 'doctor' && location.pathname !== '/d/credentials') {
-        setCheckingCredentials(true);
-        try {
-          const status = await doctorService.getCredentialsStatus(user.id);
-          if (!status.hasSubmittedCredentials) {
-            navigate('/d/credentials');
-          } else if (!status.isApproved && location.pathname !== '/d/pending-approval') {
-            navigate('/d/pending-approval');
-          }
-        } catch (error) {
-          console.error('Error checking credentials:', error);
-        } finally {
-          setCheckingCredentials(false);
-        }
-      }
-    };
-    
     if (!loading) {
       if (!user) {
-        // If no user is logged in, redirect to home
         navigate('/', { replace: true });
       } else if (user.userType !== userType) {
-        // If user type doesn't match the required type for this route
-        console.log(`Access denied: User type ${user.userType} trying to access ${userType} route`);
-        
-        // Redirect to their appropriate dashboard
-        const dashboardRoutes = {
-          'patient': '/p/dashboard',
-          'doctor': '/d/dashboard',
-          'admin': '/admin/dashboard'
-        };
-        
-        const redirectPath = dashboardRoutes[user.userType as keyof typeof dashboardRoutes] || '/';
-        navigate(redirectPath, { replace: true });
+        // Redirect to appropriate dashboard
+        if (user.userType === 'patient') {
+          navigate('/p/dashboard', { replace: true });
+        } else if (user.userType === 'doctor') {
+          navigate('/d/dashboard', { replace: true });
+        } else if (user.userType === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       } else if (user.userType === 'doctor') {
-        // Special checks for doctors only
-        checkCredentials();
+        // Handle doctor routes based on status
+        const isCredentialsRoute = location.pathname === '/d/credentials';
+        const isPendingRoute = location.pathname === '/d/pending-approval';
+        const isRejectedRoute = location.pathname === '/d/rejected';
+
+        // Use optional chaining to safely access doctorStatus
+        switch (user?.doctorStatus) {
+          case 'rejected':
+            if (!isRejectedRoute) {
+              navigate('/d/rejected', { replace: true });
+            }
+            break;
+          case 'pending':
+            if (!isPendingRoute && !isCredentialsRoute) {
+              navigate('/d/pending-approval', { replace: true });
+            }
+            break;
+          case 'approved':
+            // Allow access to doctor dashboard and related routes
+            break;
+          default:
+            // If no status (new doctor), redirect to credentials form
+            if (!isCredentialsRoute) {
+              navigate('/d/credentials', { replace: true });
+            }
+            break;
+        }
       }
     }
   }, [user, loading, userType, navigate, location.pathname]);
 
-  if (loading || checkingCredentials) {
+  if (loading) {
     return <div>Loading...</div>;
   }
 
-  // Only render children if user exists and type matches
   return user && user.userType === userType ? children : null;
 };
 
@@ -112,6 +115,11 @@ const AppWithAuth = () => {
       <Route path="/d/pending-approval" element={
         <ProtectedRoute userType="doctor">
           <PendingApproval />
+        </ProtectedRoute>
+      } />
+      <Route path="/d/rejected" element={
+        <ProtectedRoute userType="doctor">
+          <AccountRejected />
         </ProtectedRoute>
       } />
       

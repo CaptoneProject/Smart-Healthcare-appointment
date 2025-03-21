@@ -3,19 +3,23 @@ import axios from 'axios';
 // Base URL for all API requests
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-// Create axios instance with default config
+// Create axios instance with the correct base URL
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: 'http://localhost:3000/api', // This already has /api
+  timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-  },
+    'Content-Type': 'application/json'
+  }
 });
 
-// Add auth token to requests if available
+// Ensure the api interceptor correctly sets Authorization header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log('Setting auth header with token');
+  } else {
+    console.log('No token available for request');
   }
   return config;
 });
@@ -24,13 +28,29 @@ api.interceptors.request.use((config) => {
 export const authService = {
   login: async (email: string, password: string) => {
     try {
+      console.log('Attempting login for:', email);
       const response = await api.post('/auth/login', { email, password });
+      
       // Store tokens in localStorage
       localStorage.setItem('accessToken', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
       return response.data;
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error('Login error details:', {
+        response: error.response?.data,
+        status: error.response?.status,
+        message: error.message
+      });
+      
+      // Pass through the exact error message from the backend
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      
+      // Fallback generic error
+      throw new Error('Failed to login. Please try again.');
     }
   },
   
@@ -94,6 +114,16 @@ export const authService = {
       // Clear localStorage if refresh fails
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      throw error;
+    }
+  },
+
+  getDoctorStatus: async (doctorId: number) => {
+    try {
+      const response = await api.get(`/doctor/status/${doctorId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking doctor status:', error);
       throw error;
     }
   }
@@ -251,10 +281,16 @@ export const doctorService = {
   getCredentialsStatus: async (doctorId: number) => {
     try {
       const response = await api.get(`/doctor/credentials-status/${doctorId}`);
-      return response.data;
+      return {
+        status: response.data.verification_status || 'pending',
+        hasSubmittedCredentials: response.data.hasSubmittedCredentials
+      };
     } catch (error) {
-      // If the endpoint doesn't exist or returns an error, assume credentials need to be submitted
-      return { hasSubmittedCredentials: false };
+      console.error('Error checking credentials status:', error);
+      return {
+        status: 'pending',
+        hasSubmittedCredentials: false
+      };
     }
   }
 };
@@ -284,17 +320,20 @@ export const notificationService = {
 export const adminService = {
   getDoctorCredentials: async (filter: 'pending' | 'all' = 'pending') => {
     try {
-      const response = await api.get(`/api/admin/doctor-credentials?filter=${filter}`);
+      console.log(`Fetching doctor credentials with filter: ${filter}`);
+      // Remove the duplicate /api prefix
+      const response = await api.get(`/admin/doctor-credentials?filter=${filter}`);
       return response.data;
-    } catch (error) {
-      console.error("Error fetching doctor credentials:", error);
+    } catch (error: any) {
+      console.error("Error fetching doctor credentials:", error.response || error);
       throw error;
     }
   },
   
   updateDoctorStatus: async (doctorId: number, status: 'approved' | 'rejected', reason?: string) => {
     try {
-      const response = await api.put(`/api/admin/doctor-credentials/${doctorId}`, {
+      // Fix: Change from doctor-credentials/:id to doctor-credentials/status/:id
+      const response = await api.put(`/admin/doctor-credentials/status/${doctorId}`, {
         status,
         reason
       });
@@ -307,6 +346,7 @@ export const adminService = {
   
   getSystemStats: async () => {
     try {
+      // Remove the duplicate /api prefix
       const response = await api.get('/admin/system-stats');
       return response.data;
     } catch (error) {
