@@ -1,5 +1,5 @@
 // src/pages/patient/Dashboard.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -16,6 +16,8 @@ import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { useAuth } from '../../context/AuthContext';
+import { appointmentService, patientService } from '../../services/api';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -30,7 +32,7 @@ interface AppointmentCardProps {
   specialty: string;
   date: string;
   time: string;
-  status: 'Confirmed' | 'Pending';
+  status: string;
 }
 
 interface QuickActionCardProps {
@@ -41,11 +43,12 @@ interface QuickActionCardProps {
 }
 
 interface Appointment {
+  id: number;
   doctor: string;
   specialty: string;
   date: string;
   time: string;
-  status: 'Confirmed' | 'Pending';
+  status: string;
 }
 
 const DashboardCard: React.FC<DashboardCardProps> = ({ 
@@ -53,7 +56,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   title, 
   value, 
   footer, 
-  link, 
+  link 
 }) => (
   <Card>
     <div className="flex items-start justify-between">
@@ -116,50 +119,91 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, de
 );
 
 const PatientDashboard: React.FC = () => {
-  const upcomingAppointments: Appointment[] = [
-    {
-      doctor: "Dr. Sarah Wilson",
-      specialty: "General Physician",
-      date: "Feb 24, 2025",
-      time: "10:00 AM",
-      status: "Confirmed"
-    },
-    {
-      doctor: "Dr. Michael Chen",
-      specialty: "Cardiologist",
-      date: "Feb 26, 2025",
-      time: "2:30 PM",
-      status: "Pending"
-    }
-  ];
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [stats, setStats] = useState({
+    upcomingAppointments: 0,
+    activePrescriptions: 0,
+    recentDocuments: 0,
+    pendingPayments: 0
+  });
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?.id) return;
+      
+      setLoading(true);
+      try {
+        // Fetch upcoming appointments
+        const today = new Date().toISOString().split('T')[0];
+        const futureDate = new Date();
+        futureDate.setMonth(futureDate.getMonth() + 3); // 3 months in future
+        const endDate = futureDate.toISOString().split('T')[0];
+        
+        const appointmentsData = await appointmentService.getAppointments({
+          userId: user.id,
+          userType: 'patient',
+          startDate: today,
+          endDate: endDate
+        });
+        
+        // Process appointments data
+        const formattedAppointments = appointmentsData.map((appt: any) => ({
+          id: appt.id,
+          doctor: appt.doctor_name || 'Doctor',
+          specialty: appt.specialty || 'Specialist',
+          date: new Date(appt.date).toLocaleDateString(),
+          time: appt.time.substring(0, 5),
+          status: appt.status
+        }));
+        
+        setAppointments(formattedAppointments);
+        
+        // Update stats
+        setStats({
+          upcomingAppointments: formattedAppointments.length,
+          activePrescriptions: 0, // Would come from prescriptions API
+          recentDocuments: 0, // Would come from records API
+          pendingPayments: 0 // Would come from payments API
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+  }, [user?.id]);
 
   // Data for stats cards
   const dashboardStats = [
     {
       icon: Calendar,
       title: "Upcoming Appointments",
-      value: "2",
+      value: loading ? "..." : stats.upcomingAppointments,
       footer: "View all appointments",
       link: "/p/appointments"
     },
     {
       icon: Pill,
       title: "Active Prescriptions",
-      value: "3",
+      value: loading ? "..." : stats.activePrescriptions,
       footer: "View prescriptions",
       link: "/p/prescriptions"
     },
     {
       icon: FileText,
       title: "Recent Documents",
-      value: "5",
+      value: loading ? "..." : stats.recentDocuments,
       footer: "View medical records",
       link: "/p/records"
     },
     {
       icon: CreditCard,
       title: "Payment Due",
-      value: "$150.00",
+      value: loading ? "..." : `$${stats.pendingPayments}`,
       footer: "View payments",
       link: "/p/payments"
     }
@@ -177,7 +221,7 @@ const PatientDashboard: React.FC = () => {
       icon: Pill,
       title: "Request Refill",
       description: "Request a prescription refill",
-      to: "/p/prescriptions/refill"
+      to: "/p/prescriptions"
     },
     {
       icon: FileText,
@@ -199,6 +243,8 @@ const PatientDashboard: React.FC = () => {
             size="md" 
             icon={<User className="w-4 h-4" />}
             onClick={() => {}}
+            as={Link}
+            to="/p/profile"
           >
             My Profile
           </Button>
@@ -207,7 +253,7 @@ const PatientDashboard: React.FC = () => {
 
       {/* Welcome Section */}
       <Card>
-        <h2 className="text-xl font-semibold text-white/90">Welcome back, John</h2>
+        <h2 className="text-xl font-semibold text-white/90">Welcome, {user?.name}</h2>
         <p className="text-white/60 mt-2">Here's an overview of your health management</p>
       </Card>
 
@@ -233,18 +279,44 @@ const PatientDashboard: React.FC = () => {
             variant="ghost"
             size="sm"
             icon={<ArrowRight className="w-4 h-4" />}
-            onClick={() => {}}
             as={Link}
             to="/p/appointments"
           >
             View all
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {upcomingAppointments.map((appointment, index) => (
-            <AppointmentCard key={index} {...appointment} />
-          ))}
-        </div>
+        
+        {loading ? (
+          <Card className="p-6 flex justify-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500/30 border-t-blue-500"></div>
+          </Card>
+        ) : appointments.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {appointments.slice(0, 2).map((appointment, index) => (
+              <AppointmentCard 
+                key={appointment.id || index}
+                doctor={appointment.doctor}
+                specialty={appointment.specialty}
+                date={appointment.date}
+                time={appointment.time}
+                status={appointment.status}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="p-6 text-center">
+            <p className="text-white/60">No upcoming appointments</p>
+            <Button 
+              variant="primary"
+              size="sm"
+              className="mt-4"
+              as={Link}
+              to="/p/appointments"
+            >
+              Schedule New Appointment
+            </Button>
+          </Card>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -255,7 +327,6 @@ const PatientDashboard: React.FC = () => {
             variant="primary"
             size="sm"
             icon={<Plus className="w-4 h-4" />}
-            onClick={() => {}}
             as={Link}
             to="/p/appointments/new"
           >

@@ -294,11 +294,24 @@ router.get('/doctors/:id/daily-schedule', async (req, res) => {
 // Get list of doctors
 router.get('/doctors', async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, name, user_type as specialty FROM users 
-       WHERE user_type = 'doctor'`
+    // Join with doctor_credentials to get the verification status
+    const result = await pool.query(`
+      SELECT u.id, u.name, 
+             COALESCE(d.specialization, 'General Practitioner') as specialty, 
+             d.verification_status
+      FROM users u
+      LEFT JOIN doctor_credentials d ON u.id = d.doctor_id
+      WHERE u.user_type = 'doctor'
+      AND (d.verification_status = 'approved' OR d.verification_status IS NULL)
+      ORDER BY u.name
+    `);
+    
+    // Only return approved doctors
+    const approvedDoctors = result.rows.filter(doctor => 
+      doctor.verification_status === 'approved'
     );
-    res.json(result.rows);
+    
+    res.json(approvedDoctors);
   } catch (error) {
     console.error('Error fetching doctors:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -526,6 +539,80 @@ router.delete('/schedule-slots/:id', async (req, res) => {
     res.json({ message: 'Schedule slot deleted successfully' });
   } catch (error) {
     console.error('Error deleting schedule slot:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get available time slots for a doctor on a specific date
+router.get('/available-slots', async (req, res) => {
+  try {
+    const { doctorId, date } = req.query;
+    
+    if (!doctorId || !date) {
+      return res.status(400).json({ error: 'Doctor ID and date are required' });
+    }
+    
+    // Get day of week (0-6, Sunday-Saturday)
+    const dayOfWeek = new Date(date).getDay();
+    
+    // Get the doctor's schedule for this day
+    const scheduleResult = await pool.query(
+      `SELECT * FROM doctor_schedules 
+       WHERE doctor_id = $1 AND day_of_week = $2`,
+      [doctorId, dayOfWeek]
+    );
+    
+    if (scheduleResult.rows.length === 0) {
+      return res.json([]);  // No schedule for this day
+    }
+    
+    const schedule = scheduleResult.rows[0];
+    
+    // Get all existing appointments for this doctor on this date
+    const appointmentsResult = await pool.query(
+      `SELECT time FROM appointments 
+       WHERE doctor_id = $1 AND date = $2 AND status != 'cancelled'`,
+      [doctorId, date]
+    );
+    
+    const bookedTimes = appointmentsResult.rows.map(row => row.time);
+    
+    // Generate available time slots
+    const availableSlots = [];
+    const startHour = parseInt(schedule.start_time.split(':')[0], 10);
+    const endHour = parseInt(schedule.end_time.split(':')[0], 10);
+    const breakStartHour = schedule.break_start ? parseInt(schedule.break_start.split(':')[0], 10) : -1;
+    const breakEndHour = schedule.break_end ? parseInt(schedule.break_end.split(':')[0], 10) : -1;
+    
+    // Calculate slots per hour based on max_patients
+    const slotsPerHour = Math.min(schedule.max_patients || 4, 4); // Cap at 4 slots per hour
+    const minutesPerSlot = 60 / slotsPerHour;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      // Skip break time
+      if (hour >= breakStartHour && hour < breakEndHour) continue;
+      
+      for (let slot = 0; slot < slotsPerHour; slot++) {
+        const minutes = slot * minutesPerSlot;
+        const timeString = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        
+        // Check if this time is already booked
+        const isBooked = bookedTimes.some(bookedTime => 
+          bookedTime.substring(0, 5) === timeString
+        );
+        
+        if (!isBooked) {
+          availableSlots.push({
+            time: timeString,
+            available: true
+          });
+        }
+      }
+    }
+    
+    res.json(availableSlots);
+  } catch (error) {
+    console.error('Error fetching available time slots:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

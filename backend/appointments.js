@@ -57,27 +57,41 @@ const checkAvailability = async (doctorId, date, time) => {
 // GET /api/appointments
 router.get('/', async (req, res) => {
   try {
-    const { userId, userType, startDate, endDate } = req.query;
+    const { userId, userType, status, startDate, endDate } = req.query;
 
     let query = `
       SELECT a.*, 
-        p.name as patient_name, 
-        d.name as doctor_name
+             p.name as patient_name, 
+             d.name as doctor_name,
+             dc.specialization as specialty
       FROM appointments a
       JOIN users p ON a.patient_id = p.id
       JOIN users d ON a.doctor_id = d.id
-      WHERE date BETWEEN $1 AND $2
+      LEFT JOIN doctor_credentials dc ON dc.doctor_id = a.doctor_id
+      WHERE a.date BETWEEN $1 AND $2
     `;
 
+    const queryParams = [startDate, endDate];
+    let paramIndex = 3;
+
     if (userType === 'patient') {
-      query += ' AND patient_id = $3';
+      query += ` AND a.patient_id = $${paramIndex}`;
+      queryParams.push(userId);
     } else if (userType === 'doctor') {
-      query += ' AND doctor_id = $3';
+      query += ` AND a.doctor_id = $${paramIndex}`;
+      queryParams.push(userId);
     }
 
-    query += ' ORDER BY date, time';
+    // If a status filter is provided
+    if (status) {
+      paramIndex++;
+      query += ` AND a.status = $${paramIndex}`;
+      queryParams.push(status);
+    }
 
-    const result = await pool.query(query, [startDate, endDate, userId]);
+    query += ' ORDER BY a.date, a.time';
+
+    const result = await pool.query(query, queryParams);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -174,6 +188,32 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Appointment cancelled successfully' });
   } catch (error) {
     console.error('Error cancelling appointment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this route to handle appointment status updates
+router.put('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!['pending', 'confirmed', 'completed', 'cancelled', 'scheduled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating appointment status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,4 +1,4 @@
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate, NavLink } from 'react-router-dom';
 import { 
   Hospital, 
   Layout, 
@@ -9,7 +9,8 @@ import {
   Bell, 
   User,
   LogOut,
-  Clock
+  Clock,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,11 +20,11 @@ const DoctorLayout = () => {
   const { user, logout } = useAuth();
   
   const navigationItems = [
-    { icon: Layout, label: 'Dashboard', path: '/d/dashboard' },
-    { icon: Calendar, label: 'Appointments', path: '/d/appointments' },
-    { icon: Users, label: 'Patients', path: '/d/patients' },
-    { icon: FileText, label: 'Medical Records', path: '/d/records' },
-    { icon: Clock, label: 'My Schedule', path: '/d/schedule' },
+    { path: '/d/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/d/appointments', label: 'Appointments', icon: Calendar },
+    { path: '/d/patients', label: 'Patients', icon: Users },
+    { path: '/d/medical-records', label: 'Medical Records', icon: FileText },
+    { path: '/d/schedule', label: 'My Schedule', icon: Clock },
   ];
 
   const handleLogout = async () => {
@@ -52,17 +53,18 @@ const DoctorLayout = () => {
           <ul className="space-y-2">
             {navigationItems.map((item) => (
               <li key={item.path}>
-                <Link
+                <NavLink
                   to={item.path}
-                  className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
-                    location.pathname === item.path
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={({ isActive }) => `
+                    flex items-center px-4 py-3 rounded-lg transition-colors
+                    ${isActive 
+                      ? 'bg-blue-500/20 text-blue-400' 
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white'}
+                  `}
                 >
                   <item.icon className="w-5 h-5 mr-3" />
                   {item.label}
-                </Link>
+                </NavLink>
               </li>
             ))}
           </ul>

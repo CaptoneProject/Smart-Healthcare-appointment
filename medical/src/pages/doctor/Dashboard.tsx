@@ -128,7 +128,8 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, de
 
 const DoctorDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
   const [stats, setStats] = useState({
     todayCount: 0,
@@ -141,68 +142,72 @@ const DoctorDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!user) return;
+      if (!user?.id) return;
       
-      setIsLoading(true);
       try {
+        setLoading(true);
+        
         // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
         
         // Fetch today's appointments
-        const appointments = await appointmentService.getAppointments({
+        const appointmentsData = await appointmentService.getAppointments({
           userId: user.id,
           userType: 'doctor',
           startDate: today,
           endDate: today
         });
+
+        // Process appointments
+        const processedAppointments = appointmentsData.map((appt: any) => ({
+          id: appt.id,
+          patient_name: appt.patient_name || 'Patient',
+          date: appt.date,
+          time: appt.time,
+          type: appt.type || 'Consultation',
+          status: appt.status || 'Scheduled'
+        }));
         
-        setTodayAppointments(appointments || []);
-        
-        // Set basic stats based on available data
-        setStats({
-          todayCount: appointments?.length || 0,
-          pendingCount: 0, // This would come from a backend API
-          newPatients: 0,  // This would come from a backend API
-          pendingReports: 0 // This would come from a backend API
-        });
+        setTodayAppointments(processedAppointments);
         
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
-    
+
     fetchDashboardData();
-  }, [user]);
+  }, [user?.id]);
 
   // Data for stats cards
   const dashboardStats = [
     {
       icon: Calendar,
       title: "Today's Appointments",
-      value: isLoading ? "..." : stats.todayCount,
+      value: loading ? "..." : stats.todayCount,
       footer: "View schedule",
       link: "/d/schedule"
     },
     {
       icon: Clock,
       title: "Pending Appointments",
-      value: isLoading ? "..." : stats.pendingCount,
+      value: loading ? "..." : stats.pendingCount,
       footer: "View all",
       link: "/d/appointments"
     },
     {
       icon: UserPlus,
       title: "Patients",
-      value: isLoading ? "..." : "Manage",
+      value: loading ? "..." : "Manage",
       footer: "View patients",
       link: "/d/patients"
     },
     {
       icon: FileText,
       title: "Medical Records",
-      value: isLoading ? "..." : "Access",
+      value: loading ? "..." : "Access",
       footer: "View records",
       link: "/d/records"
     }
@@ -230,7 +235,7 @@ const DoctorDashboard: React.FC = () => {
     }
   ];
 
-  if (isLoading) {
+  if (loading) {
     return <div className="p-6">Loading dashboard...</div>;
   }
 
@@ -291,24 +296,27 @@ const DoctorDashboard: React.FC = () => {
             </Button>
           </Link>
         </div>
-        {todayAppointments.length > 0 ? (
+
+        {loading ? (
+          <div className="flex justify-center p-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : todayAppointments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {todayAppointments.map((appointment, index) => (
-              <AppointmentCard 
-                key={index} 
-                patientName={appointment.patient_name} 
+            {todayAppointments.map((appointment) => (
+              <AppointmentCard
+                key={appointment.id}
+                patientName={appointment.patient_name}
                 date={appointment.date}
                 time={appointment.time}
-                type={appointment.type || "Consultation"}
+                type={appointment.type}
                 status={appointment.status}
               />
             ))}
           </div>
         ) : (
-          <Card>
-            <div className="p-6 text-center">
-              <p className="text-white/60">No appointments scheduled for today</p>
-            </div>
+          <Card className="p-6 text-center">
+            <p className="text-white/60">No appointments scheduled for today</p>
           </Card>
         )}
       </div>

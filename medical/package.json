@@ -10,20 +10,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@headlessui/react": "^1.7.13",
     "@tailwindcss/vite": "^4.0.8",
+    "axios": "^1.6.0",
+    "date-fns": "^2.30.0",
+    "express-rate-limit": "^6.7.0",
+    "express-validator": "^6.15.0",
+    "helmet": "^6.0.1",
+    "jwt-decode": "^3.1.2",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.2.0",
-    "tailwindcss": "^4.0.8",
-    "axios": "^1.6.0",
-    "date-fns": "^2.30.0",
-    "jwt-decode": "^3.1.2",
     "react-hook-form": "^7.43.9",
-    "@headlessui/react": "^1.7.13",
-    "express-validator": "^6.15.0",
-    "helmet": "^6.0.1",
-    "express-rate-limit": "^6.7.0"
+    "react-router-dom": "^7.2.0",
+    "tailwindcss": "^4.0.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
@@ -34,9 +37,9 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
+    "nodemon": "^2.0.22",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.22.0",
-    "vite": "^6.1.0",
-    "nodemon": "^2.0.22"
+    "vite": "^6.1.0"
   }
 }

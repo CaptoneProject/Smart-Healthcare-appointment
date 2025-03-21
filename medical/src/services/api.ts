@@ -153,6 +153,12 @@ export const appointmentService = {
     // Using /api/appointments/:id
     const response = await api.delete(`/appointments/${id}`);
     return response.data;
+  },
+
+  updateAppointmentStatus: async (id: number, status: string) => {
+    // Using /api/appointments/:id/status
+    const response = await api.put(`/appointments/${id}/status`, { status });
+    return response.data;
   }
 };
 
@@ -231,9 +237,10 @@ export const doctorService = {
   
   getDoctors: async () => {
     try {
-      const response = await api.get('/doctors');
+      const response = await api.get('/doctor/doctors');
       return response.data;
     } catch (error) {
+      console.error('Error fetching doctors:', error);
       throw error;
     }
   },
@@ -311,6 +318,18 @@ export const doctorService = {
         status: 'pending',
         hasSubmittedCredentials: false
       };
+    }
+  },
+  
+  getAvailableTimeSlots: async (doctorId: number, date: string) => {
+    try {
+      const response = await api.get('/doctor/available-slots', {
+        params: { doctorId, date }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching available time slots:', error);
+      return [];
     }
   }
 };

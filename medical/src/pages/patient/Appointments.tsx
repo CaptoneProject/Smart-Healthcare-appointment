@@ -18,15 +18,18 @@ import AppointmentForm, { AppointmentFormData } from '../../components/forms/App
 import { appointmentService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
+
 interface Appointment {
   id: number;
   doctor: string;
+  doctor_name?: string;
   specialty: string;
   date: string;
   time: string;
   location: string;
-  status: 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
+  status: string; // Use string instead of enum to avoid case issues
   type: string;
+  notes?: string;
 }
 
 interface AppointmentCardProps {
@@ -35,17 +38,30 @@ interface AppointmentCardProps {
   onCancelAppointment: (appointmentId: number) => void;
 }
 
+// Update the AppointmentCard component to properly format the date
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
   appointment, 
   onViewDetails, 
   onCancelAppointment 
 }) => {
+  const statusLower = appointment.status.toLowerCase();
+  
+  // Format date for display - extract this to avoid repetition
+  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short', 
+    day: 'numeric'
+  });
+  
+  // Format time to remove seconds
+  const formattedTime = appointment.time.substring(0, 5);
+  
   return (
     <Card>
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-medium text-lg text-white/90">{appointment.doctor}</h3>
-          <p className="text-white/60">{appointment.specialty}</p>
+          <p className="text-sm text-white/60">{appointment.specialty}</p>
         </div>
         <StatusBadge status={appointment.status} />
       </div>
@@ -53,9 +69,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <div className="space-y-3">
         <div className="flex items-center text-white/60">
           <CalendarIcon className="w-4 h-4 mr-2" />
-          {appointment.date}
+          {formattedDate}
           <Clock className="w-4 h-4 ml-4 mr-2" />
-          {appointment.time}
+          {formattedTime}
         </div>
         <div className="flex items-center text-white/60">
           <MapPin className="w-4 h-4 mr-2" />
@@ -75,7 +91,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         >
           View Details
         </Button>
-        {appointment.status === 'Confirmed' && (
+        {statusLower === 'confirmed' && (
           <Button 
             variant="danger" 
             size="sm"
@@ -104,46 +120,80 @@ const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Appointment Details">
-      <div className="space-y-4">
-        <div className="flex justify-between items-start">
+      <AppointmentDetails appointment={appointment} onClose={onClose} />
+    </Modal>
+  );
+};
+
+interface AppointmentDetailsProps {
+  appointment: Appointment;
+  onClose: () => void;
+}
+
+const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointment, onClose }) => {
+  // Format the date properly
+  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long', 
+    day: 'numeric'
+  });
+  
+  // Format the time properly (remove seconds)
+  const formattedTime = appointment.time.substring(0, 5);
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-white/90 mb-1">Appointment Details</h3>
+        <div className="space-y-4">
           <div>
-            <h3 className="text-xl font-semibold text-white/90">{appointment.doctor}</h3>
-            <p className="text-white/60">{appointment.specialty}</p>
+            <h4 className="font-medium text-white/90">{appointment.doctor_name}</h4>
+            <p className="text-sm text-white/60">
+              {appointment.specialty || "General Practice"}
+            </p>
           </div>
+          
           <StatusBadge status={appointment.status} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 pb-4">
-          <div>
-            <p className="text-white/60 text-sm">Date</p>
-            <p className="text-white/90">{appointment.date}</p>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-white/60 mb-1">Date</label>
+              <p className="text-white">{formattedDate}</p>
+            </div>
+            <div>
+              <label className="block text-sm text-white/60 mb-1">Time</label>
+              <p className="text-white">{formattedTime}</p>
+            </div>
+            <div>
+              <label className="block text-sm text-white/60 mb-1">Location</label>
+              <p className="text-white">{appointment.location || "Main Clinic"}</p>
+            </div>
+            <div>
+              <label className="block text-sm text-white/60 mb-1">Type</label>
+              <p className="text-white">{appointment.type}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-white/60 text-sm">Time</p>
-            <p className="text-white/90">{appointment.time}</p>
-          </div>
-          <div>
-            <p className="text-white/60 text-sm">Location</p>
-            <p className="text-white/90">{appointment.location}</p>
-          </div>
-          <div>
-            <p className="text-white/60 text-sm">Type</p>
-            <p className="text-white/90">{appointment.type}</p>
-          </div>
-        </div>
-
-        <div className="border-t border-white/10 pt-4 flex justify-end space-x-3">
-          {appointment.status === 'Confirmed' && (
-            <Button variant="secondary" size="sm">
-              Reschedule
-            </Button>
+          
+          {appointment.notes && (
+            <div>
+              <label className="block text-sm text-white/60 mb-1">Notes</label>
+              <p className="text-white text-sm">{appointment.notes}</p>
+            </div>
           )}
-          <Button variant="primary" size="sm" onClick={onClose}>
-            Close
-          </Button>
         </div>
       </div>
-    </Modal>
+      
+      <div className="pt-4 border-t border-white/10 flex justify-end">
+        <Button 
+          variant="secondary" 
+          size="md" 
+          onClick={onClose}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
   );
 };
 
@@ -159,87 +209,123 @@ const PatientAppointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Only fetch if user is logged in
-    if (user) {
-      fetchAppointments();
-    }
-  }, [user]);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  
+  // Move this useState to the top level
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
   const fetchAppointments = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    setError(null);
+    if (!user?.id) return;
     
     try {
-      // Get date range for the past 6 months and next 6 months
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 6);
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 6);
+      setLoading(true);
       
-      const formattedStartDate = startDate.toISOString().split('T')[0];
-      const formattedEndDate = endDate.toISOString().split('T')[0];
+      // Get current date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
       
-      const data = await appointmentService.getAppointments({
+      // Get date 1 year in the future
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+      const endDate = futureDate.toISOString().split('T')[0];
+      
+      // Get date 1 year in the past
+      const pastDate = new Date();
+      pastDate.setFullYear(pastDate.getFullYear() - 1);
+      const startDate = pastDate.toISOString().split('T')[0];
+      
+      const appointmentsData = await appointmentService.getAppointments({
         userId: user.id,
         userType: 'patient',
-        startDate: formattedStartDate,
-        endDate: formattedEndDate
+        startDate, // Include past appointments
+        endDate // Include future appointments
       });
       
-      // Transform API data to match component's expected format
-      const transformedData = data.map((item: any) => ({
-        id: item.id,
-        doctor: item.doctor_name,
-        specialty: item.doctor_specialty || "Specialty not specified",
-        date: item.date,
-        time: item.time,
-        location: item.location || "Main Clinic",
-        status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
-        type: item.type || "Consultation"
+      // Process appointments for display
+      const processedAppointments = appointmentsData.map((appt: any) => ({
+        id: appt.id,
+        doctor: appt.doctor_name || 'Doctor',
+        doctor_name: appt.doctor_name || 'Doctor',
+        specialty: appt.specialty || 'General Practice',
+        // Preserve the original date format for consistent comparison
+        date: appt.date,
+        time: appt.time,
+        location: appt.location || 'Main Clinic',
+        status: appt.status || 'Pending',
+        type: appt.type || 'Consultation',
+        notes: appt.notes || ''
       }));
       
-      setAppointments(transformedData);
-    } catch (err: any) {
-      console.error('Error fetching appointments:', err);
-      setError('Failed to load appointments. Please try again later.');
+      setAppointments(processedAppointments);
+      
+      // Create calendar events from appointments
+      const events = processedAppointments.map((appointment: { id: any; time: string; doctor: any; date: any; status: string; type: any; }) => ({
+        id: appointment.id,
+        title: `${appointment.time.substring(0, 5)} - Dr. ${appointment.doctor}`,
+        date: appointment.date, 
+        classNames: getEventClassName(appointment.status),
+        extendedProps: {
+          status: appointment.status,
+          type: appointment.type
+        }
+      }));
+      
+      setCalendarEvents(events);
+      
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      setError('Failed to load appointments. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Convert appointments to calendar events
-  const calendarEvents = appointments.map(appointment => ({
-    id: appointment.id,
-    date: new Date(appointment.date),
-    title: `${appointment.time} - ${appointment.doctor}`,
-    type: appointment.type
-  }));
+  useEffect(() => {
+    fetchAppointments();
+  }, [user?.id]);
 
-  const filteredAppointments = appointments.filter(appointment => {
-    // Filter by status
-    if (filter !== 'all') {
-      const isUpcoming = new Date(`${appointment.date} ${appointment.time}`) > new Date();
-      if (filter === 'upcoming' && !isUpcoming) return false;
-      if (filter === 'past' && isUpcoming) return false;
-    }
+  const filterAppointments = () => {
+    if (!appointments) return [];
     
-    // Filter by search query
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    
+    return appointments.filter(appointment => {
+      const appointmentDate = new Date(appointment.date);
+      appointmentDate.setHours(0, 0, 0, 0); // Start of appointment date
+      const statusLower = appointment.status.toLowerCase();
+      
+      if (filter === 'upcoming') {
+        // Only future appointments and today's appointments
+        return appointmentDate >= today && statusLower !== 'cancelled';
+      } else if (filter === 'past') {
+        // Only past appointments
+        return appointmentDate < today || statusLower === 'completed';
+      } else {
+        // All appointments
+        return true;
+      }
+    });
+  };
+
+  const getFilteredAppointments = () => {
+    const filtered = filterAppointments();
+    
+    // Apply search filter if there's a query
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
-      return (
+      return filtered.filter(appointment => (
         appointment.doctor.toLowerCase().includes(searchLower) ||
         appointment.specialty.toLowerCase().includes(searchLower) ||
         appointment.location.toLowerCase().includes(searchLower) ||
         appointment.type.toLowerCase().includes(searchLower)
-      );
+      ));
     }
     
-    return true;
-  });
+    return filtered;
+  };
 
   const filterOptions = [
     { id: 'all', label: 'All' },
@@ -280,11 +366,11 @@ const PatientAppointments: React.FC = () => {
   };
 
   const handleScheduleAppointment = async (data: AppointmentFormData) => {
-    if (!user) return;
-    
     try {
+      setError('');
+      
       await appointmentService.createAppointment({
-        patientId: user.id,
+        patientId: user!.id,
         doctorId: data.doctorId,
         date: data.date,
         time: data.time,
@@ -303,11 +389,259 @@ const PatientAppointments: React.FC = () => {
     }
   };
 
-  const handleCalendarEventClick = (event: any) => {
-    const appointment = appointments.find(a => a.id === event.id);
+  const handleCalendarEventClick = (info: any) => {
+    const appointmentId = parseInt(info.event.id);
+    const appointment = appointments.find(a => a.id === appointmentId);
     if (appointment) {
-      handleViewDetails(appointment);
+      setSelectedAppointment(appointment);
+      setIsDetailsModalOpen(true); // Use the correct modal state variable
     }
+  };
+
+  // Add this helper function to get event class names based on status
+  const getEventClassName = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'cancelled': return 'bg-red-500/50 border-red-500';
+      case 'completed': return 'bg-green-500/50 border-green-500';
+      case 'confirmed': return 'bg-blue-500/50 border-blue-500';
+      case 'pending': return 'bg-yellow-500/50 border-yellow-500';
+      default: return 'bg-blue-500/50 border-blue-500';
+    }
+  };
+
+  // Update the calendar render code
+  const renderCalendarView = () => {
+    // Add console logging for appointments to debug date formats
+    console.log("Current appointments:", appointments.map(a => ({ 
+      id: a.id, 
+      date: a.date,
+      status: a.status 
+    })));
+    
+    // Group appointments by date for easier rendering
+    const appointmentsByDate: Record<string, Appointment[]> = {};
+    
+    appointments.forEach(appointment => {
+      // Get date in YYYY-MM-DD format regardless of input format
+      let dateKey;
+      try {
+        // Handle both ISO format and YYYY-MM-DD format
+        const dateObj = new Date(appointment.date);
+        dateKey = dateObj.toISOString().split('T')[0];
+        console.log(`Processing appointment date: ${appointment.date} → ${dateKey}`);
+      } catch (e) {
+        console.error(`Error processing date: ${appointment.date}`, e);
+        return; // Skip this appointment if date is invalid
+      }
+      
+      if (!appointmentsByDate[dateKey]) {
+        appointmentsByDate[dateKey] = [];
+      }
+      appointmentsByDate[dateKey].push(appointment);
+    });
+    
+    // Log the appointment groups for debugging
+    console.log("Appointments by date:", Object.keys(appointmentsByDate));
+    
+    // Get current month and year for the calendar
+    // Remove the useState from here - use the one from above
+    // const [currentMonth, setCurrentMonth] = useState(() => {
+    //   const today = new Date();
+    //   return new Date(today.getFullYear(), today.getMonth(), 1);
+    // });
+    
+    // Get days in the current month
+    const getDaysInMonth = (date: Date) => {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    };
+    
+    // Get day of week for the first day of the month
+    const getFirstDayOfMonth = (date: Date) => {
+      return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    };
+    
+    // Navigate to previous month
+    const goToPreviousMonth = () => {
+      setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    };
+    
+    // Navigate to next month
+    const goToNextMonth = () => {
+      setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    };
+    
+    // Format date as YYYY-MM-DD consistently
+    const formatDateString = (year: number, month: number, day: number) => {
+      const date = new Date(year, month, day);
+      return date.toISOString().split('T')[0];
+    };
+    
+    // Check if a date has appointments (with better logging)
+    const hasAppointments = (year: number, month: number, day: number) => {
+      const dateString = formatDateString(year, month, day);
+      const hasAppt = Boolean(appointmentsByDate[dateString]?.length);
+      
+      // Only log days with appointments to reduce console spam
+      if (hasAppt) {
+        console.log(`Found appointments on ${dateString}:`, appointmentsByDate[dateString]);
+      }
+      
+      return hasAppt;
+    };
+    
+    // Get status for date with appointments (for color coding)
+    const getAppointmentStatus = (year: number, month: number, day: number) => {
+      const dateString = formatDateString(year, month, day);
+      const dateAppointments = appointmentsByDate[dateString] || [];
+      
+      if (dateAppointments.length === 0) return null;
+      
+      // Log the appointments for this date to debug
+      console.log(`Status check for ${dateString}:`, dateAppointments.map(a => a.status));
+      
+      // Priority: confirmed > pending > completed > cancelled > scheduled
+      if (dateAppointments.some(a => a.status.toLowerCase() === 'confirmed')) {
+        return 'confirmed';
+      }
+      if (dateAppointments.some(a => a.status.toLowerCase() === 'scheduled')) {
+        return 'scheduled'; // Add this line to handle "scheduled" status
+      }
+      if (dateAppointments.some(a => a.status.toLowerCase() === 'pending')) {
+        return 'pending';  
+      }
+      if (dateAppointments.some(a => a.status.toLowerCase() === 'completed')) {
+        return 'completed';
+      }
+      if (dateAppointments.some(a => a.status.toLowerCase() === 'cancelled')) {
+        return 'cancelled';
+      }
+      
+      // Default to the status of the first appointment if none of the above match
+      return dateAppointments[0].status.toLowerCase();
+    };
+    
+    // Handle click on a date
+    const handleDateClick = (year: number, month: number, day: number) => {
+      const dateString = formatDateString(year, month, day);
+      const dateAppointments = appointmentsByDate[dateString] || [];
+      
+      if (dateAppointments.length > 0) {
+        setSelectedAppointment(dateAppointments[0]);
+        setIsDetailsModalOpen(true);
+      }
+    };
+    
+    // Get background class based on appointment status
+    const getStatusClass = (status: string | null) => {
+      if (!status) return '';
+      
+      switch (status.toLowerCase()) {
+        case 'confirmed': return 'bg-blue-500/20 border-blue-500';
+        case 'pending': return 'bg-yellow-500/20 border-yellow-500'; 
+        case 'completed': return 'bg-green-500/20 border-green-500';
+        case 'cancelled': return 'bg-red-500/20 border-red-500';
+        case 'scheduled': return 'bg-blue-500/20 border-blue-500'; // Handle "scheduled" status
+        default: return 'bg-blue-500/20 border-blue-500'; // Default to blue for unknown statuses
+      }
+    };
+    
+    // Generate calendar grid
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDayOfMonth = getFirstDayOfMonth(currentMonth);
+    const days = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-16 border border-white/10"></div>);
+    }
+    
+    // Add cells for each day in the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const hasAppts = hasAppointments(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const status = getAppointmentStatus(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      
+      days.push(
+        <div 
+          key={`day-${day}`}
+          className={`h-16 border border-white/10 p-1 relative ${
+            hasAppts 
+              ? `cursor-pointer hover:bg-white/20 ${getStatusClass(status)}` 
+              : ''
+          }`}
+          onClick={() => hasAppts && handleDateClick(currentMonth.getFullYear(), currentMonth.getMonth(), day)}
+        >
+          <div className="font-medium text-sm">{day}</div>
+          {/* Remove the dot since we're coloring the whole cell */}
+        </div>
+      );
+    }
+    
+    // Add this debugging in your renderCalendarView function after the appointment grouping
+    // Check the March 25th appointment specifically
+    const marchDate = new Date(2025, 2, 25); // March 25, 2025
+    const marchDateISO = marchDate.toISOString().split('T')[0];
+    const marchAppointments = appointmentsByDate[marchDateISO] || [];
+
+    console.log("March 25th appointments:", {
+      dateString: marchDateISO,
+      appointments: marchAppointments,
+      statuses: marchAppointments.map(a => ({
+        original: a.status,
+        lowercase: a.status.toLowerCase()
+      }))
+    });
+
+    return (
+      <div className="bg-white/5 rounded-lg backdrop-blur-sm p-6">
+        <div className="flex justify-between items-center mb-4">
+          <button 
+            onClick={goToPreviousMonth}
+            className="text-white/60 hover:text-white/90 transition-colors"
+          >
+            &lt; Previous
+          </button>
+          <h3 className="font-medium text-lg">
+            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h3>
+          <button 
+            onClick={goToNextMonth}
+            className="text-white/60 hover:text-white/90 transition-colors"
+          >
+            Next &gt;
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {/* Day headers */}
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-center font-medium text-white/60 py-2">{day}</div>
+          ))}
+          
+          {/* Calendar days */}
+          {days}
+        </div>
+        
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap gap-4 justify-end">
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-blue-500/20 border border-blue-500 mr-2"></div>
+            <span className="text-xs text-white/60">Confirmed/Scheduled</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500 mr-2"></div>
+            <span className="text-xs text-white/60">Pending</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500 mr-2"></div>
+            <span className="text-xs text-white/60">Completed</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500 mr-2"></div>
+            <span className="text-xs text-white/60">Cancelled</span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -321,7 +655,7 @@ const PatientAppointments: React.FC = () => {
             variant="primary" 
             size="md" 
             icon={<Plus className="w-4 h-4" />}
-            onClick={() => setIsNewAppointmentOpen(true)}
+            onClick={() => setIsNewAppointmentOpen(true)} // Make sure this is correct
           >
             New Appointment
           </Button>
@@ -353,15 +687,12 @@ const PatientAppointments: React.FC = () => {
       ) : (
         <>
           {/* Calendar View */}
-          <Calendar 
-            events={calendarEvents}
-            onEventClick={handleCalendarEventClick}
-          />
+          {renderCalendarView()}
 
           {/* Appointments List */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredAppointments.length > 0 ? (
-              filteredAppointments.map((appointment) => (
+            {getFilteredAppointments().length > 0 ? (
+              getFilteredAppointments().map((appointment) => (
                 <AppointmentCard 
                   key={appointment.id} 
                   appointment={appointment} 

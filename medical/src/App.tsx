@@ -12,6 +12,7 @@ import DoctorDashboard from './pages/doctor/Dashboard';
 import DoctorLayout from './layouts/DoctorLayout';
 import DoctorSchedule from './pages/doctor/Schedule';
 import DoctorCredentialsForm from './pages/doctor/CredentialsForm';
+import DoctorAppointments from './pages/doctor/Appointments';
 import { doctorService } from './services/api';
 import PendingApproval from './pages/doctor/PendingApproval';
 import AdminLayout from './layouts/AdminLayout';
@@ -108,6 +109,7 @@ const AppWithAuth = () => {
         <Route path="dashboard" element={<DoctorDashboard />} />
         <Route path="schedule" element={<DoctorSchedule />} />
         <Route path="credentials" element={<DoctorCredentialsForm />} />
+        <Route path="appointments" element={<DoctorAppointments />} />
         {/* Other doctor routes */}
       </Route>
       
