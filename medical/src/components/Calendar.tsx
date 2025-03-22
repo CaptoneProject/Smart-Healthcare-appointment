@@ -77,11 +77,22 @@ const Calendar: React.FC<CalendarProps> = ({
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const isToday = todayStr === cellDateStr;
     
-    if (eventsOnThisDay.length > 0) {
-      return 'bg-green-500/20 border border-green-500';
+    // First check if it's both today and has an event
+    if (isToday && eventsOnThisDay.length > 0) {
+      return 'bg-purple-500/20 border-purple-500 font-bold'; // Special case: today with appointment
     }
     
-    return isToday ? 'bg-blue-500/10 border border-blue-500/30' : '';
+    // Then check if it just has events
+    if (eventsOnThisDay.length > 0) {
+      return 'bg-blue-500/20 border-blue-500'; // Appointment date
+    }
+    
+    // Then if it's just today
+    if (isToday) {
+      return 'relative ring-2 ring-white/50 font-bold'; // Today's date with ring and bold text
+    }
+    
+    return ''; // No special styling for regular dates
   };
 
   // Check if date is today
@@ -92,10 +103,10 @@ const Calendar: React.FC<CalendarProps> = ({
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDayOfMonth = getFirstDayOfMonth(currentDate);
 
-    // Add empty cells for days before first day of month
+    // Add borders to the empty cells
     for (let i = 0; i < firstDayOfMonth; i++) {
       days.push(
-        <div key={`empty-${i}`} className="h-12 p-1" />
+        <div key={`empty-${i}`} className="h-12 p-1 border border-white/10 rounded" />
       );
     }
 
@@ -103,13 +114,16 @@ const Calendar: React.FC<CalendarProps> = ({
     const currentMonth = currentDate.getMonth(); // 0-based
     const cells = [];
 
+    // Add borders to the day cells
     for (let day = 1; day <= daysInMonth; day++) {
       // Construct a string in YYYY-MM-DD format
       const cellDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      // Include border-white/10 as a default border that will be overridden by getDateClass if needed
       cells.push(
         <div
           key={`day-${day}`}
-          className={`h-12 p-1 rounded cursor-pointer ${getDateClass(cellDateStr)}`}
+          className={`h-12 p-1 rounded cursor-pointer flex items-center justify-center border border-white/10 ${getDateClass(cellDateStr)}`}
           onClick={() => onDateClick && onDateClick(parseDateWithoutTimezone(cellDateStr))}
         >
           {day}
