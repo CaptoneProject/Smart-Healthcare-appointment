@@ -1,20 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
-
-// Database connection - Match the format from server.js
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
+const db = require('./database'); // Add this line to use the shared database module
 
 // Initialize tables
 const initTables = async () => {
-  await pool.query(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),
@@ -41,14 +32,14 @@ const emailTransporter = nodemailer.createTransport({
 const sendNotification = async ({ userId, type, message }) => {
   try {
     // Save to database
-    await pool.query(
+    await db.query(
       `INSERT INTO notifications (user_id, type, message)
        VALUES ($1, $2, $3)`,
       [userId, type, message]
     );
 
     // Get user email
-    const userResult = await pool.query(
+    const userResult = await db.query(
       'SELECT email, name FROM users WHERE id = $1',
       [userId]
     );
@@ -88,7 +79,7 @@ const scheduleReminders = async () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT a.*, d.name as doctor_name
        FROM appointments a
        JOIN users d ON a.doctor_id = d.id
@@ -112,7 +103,7 @@ router.get('/notifications', async (req, res) => {
   try {
     const { userId } = req.query;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT * FROM notifications
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -131,7 +122,7 @@ router.put('/notifications/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query(
+    await db.query(
       `UPDATE notifications
        SET is_read = true
        WHERE id = $1`,
@@ -150,7 +141,7 @@ router.put('/notifications/:id/read', async (req, res) => {
 // Get appointment details by ID
 const getAppointmentDetails = async (appointmentId) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT a.*, p.name as patient_name, d.name as doctor_name
        FROM appointments a
        JOIN users p ON a.patient_id = p.id
@@ -168,7 +159,7 @@ const getAppointmentDetails = async (appointmentId) => {
 // Create a notification in database
 const createNotification = async (notification) => {
   try {
-    await pool.query(
+    await db.query(
       `INSERT INTO notifications
        (user_id, type, title, message, related_id, is_read)
        VALUES ($1, $2, $3, $4, $5, false)`,
