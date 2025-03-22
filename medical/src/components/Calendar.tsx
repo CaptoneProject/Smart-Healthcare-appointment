@@ -66,15 +66,18 @@ const Calendar: React.FC<CalendarProps> = ({
     return events.filter(event => event.date === dateStr);
   };
 
-  // Fix the getDateClass function to correctly compare dates
+  // Update the getDateClass function with a more robust approach
   const getDateClass = (cellDateStr: string): string => {
-    // For direct string comparison with the event date
+    // Add debug logging to see what's happening with the dates
+    console.log('Calendar comparing cell date:', cellDateStr);
+    
+    // Direct string comparison approach - no date objects that could cause timezone issues
     const eventsOnThisDay = events.filter(event => {
-      // Direct string comparison without any date manipulation
-      const eventDateStr = event.date;
-      const match = eventDateStr === cellDateStr;
-      console.log(`Comparing dates - Cell: ${cellDateStr}, Event: ${eventDateStr}, Match: ${match}`);
-      return match && event.status === 'confirmed';
+      console.log(`Calendar event date for comparison: ${event.date}, cell: ${cellDateStr}`);
+      // Use exact string comparison without any date manipulation
+      const isMatch = event.date === cellDateStr && event.status === 'confirmed';
+      if (isMatch) console.log('MATCH FOUND!');
+      return isMatch;
     });
     
     // Check if today

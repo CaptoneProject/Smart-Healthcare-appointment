@@ -40,12 +40,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onViewDetails, 
   onCancelAppointment 
 }) => {
-  // Update the date formatting to match the server format
-  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric'
-  });
+  // Don't use Date constructor - use the date string directly to prevent timezone shifts
+  // Adjust the formatting without using Date constructor
+  const formattedDate = appointment.date.split('-').reverse().join('/');
 
   return (
     <Card>
@@ -269,14 +266,15 @@ const PatientAppointments: React.FC = () => {
     }
   };
 
-  // Convert appointments to calendar events
+  // Convert appointments to calendar events - with extra debug
   const calendarEvents = appointments
     .filter(appointment => appointment.status.toLowerCase() === 'confirmed')
     .map(appointment => {
-      console.log('Event date:', appointment.date); // Debug line to verify format
+      // Keep the date exactly as is from backend
+      console.log('Creating calendar event with date:', appointment.date, 'from appointment:', appointment);
       return {
         id: appointment.id,
-        date: appointment.date, // Keep as-is, don't manipulate
+        date: appointment.date, // No manipulation at all
         title: `${appointment.time} - ${appointment.doctor}`,
         type: appointment.type,
         status: 'confirmed'
@@ -355,15 +353,22 @@ const PatientAppointments: React.FC = () => {
     try {
       setError('');
       
-      await appointmentService.createAppointment({
+      console.log('Selected date:', data.date);
+      
+      // Keep the date exactly as selected
+      const appointmentData = {
         patientId: user!.id,
         doctorId: data.doctorId,
-        date: data.date,
+        date: data.date, // Keep as-is without manipulation
         time: data.time,
         duration: 30, // Default duration in minutes
         type: data.type,
         notes: data.reason
-      });
+      };
+      
+      console.log('Appointment data before API call:', appointmentData);
+      
+      await appointmentService.createAppointment(appointmentData);
       
       setIsNewAppointmentOpen(false);
       

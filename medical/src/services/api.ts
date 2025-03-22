@@ -138,8 +138,31 @@ export const appointmentService = {
   },
   
   createAppointment: async (data: any) => {
-    // Don't modify the date, send it as is
-    const response = await api.post('/appointments', data);
+    console.log('API date before sending:', data.date);
+    
+    // Fix for timezone shift: subtract one day to counter the timezone shift
+    let appointmentDate = data.date;
+    
+    // Check if the date is being shifted to the next day
+    // This compensates for the timezone issue by shifting the date back
+    const originalDate = new Date(data.date);
+    const dateToSend = new Date(originalDate);
+    dateToSend.setDate(dateToSend.getDate() - 1);
+    
+    // Format in YYYY-MM-DD
+    const fixedDate = dateToSend.toISOString().split('T')[0];
+    
+    console.log('Original selected date:', data.date);
+    console.log('Adjusted date to send:', fixedDate);
+    
+    // Send the adjusted date to counter the timezone shift
+    const response = await api.post('/appointments', {
+      ...data,
+      date: fixedDate // Send the fixed date
+    });
+    
+    console.log('API response date:', response.data.date);
+    
     return response.data;
   },
   

@@ -111,23 +111,71 @@ const AppointmentDetailsModal: React.FC<{
   );
 };
 
+const AppointmentDetails: React.FC<{ appointment: Appointment, onClose: () => void }> = ({ 
+  appointment, 
+  onClose 
+}) => {
+  // Use direct string formatting to avoid timezone issues
+  const formatDisplayDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+    
+    // Format without timezone conversion
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-white/90 mb-1">Appointment Details</h3>
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium text-white/90">{appointment.patientName}</h4>
+            <p className="text-sm text-white/60">Patient</p>
+          </div>
+          
+          <StatusBadge status={appointment.status} />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-white/60 text-sm mb-1">Date</p>
+              <p className="text-white/90">{formatDisplayDate(appointment.date)}</p>
+            </div>
+            
+            <div>
+              <p className="text-white/60 text-sm mb-1">Time</p>
+              <p className="text-white/90">{appointment.time}</p>
+            </div>
+            
+            {/* Rest of the component */}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
   appointment, 
   onViewDetails,
   onUpdateStatus
 }) => {
-  const statusLower = appointment.status.toLowerCase();
+  // Don't create a Date object - this avoids timezone issues
+  // Instead, directly format the date string
+  const formattedDate = appointment.date.split('-').reverse().join('/');
   
-  // Format date for display
-  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
-    month: 'short', 
-    day: 'numeric',
-    year: 'numeric'
-  });
-  
-  // Format time (remove seconds)
-  const formattedTime = appointment.time.substring(0, 5);
-  
+  // Alternative method: Use this consistent date formatting approach
+  const formatDisplayDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)}, ${year}`;
+  };
+
   return (
     <Card>
       <div className="flex justify-between items-start mb-4">
@@ -140,9 +188,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <div className="space-y-3">
         <div className="flex items-center text-white/60">
           <Calendar className="w-4 h-4 mr-2" />
-          {formattedDate}
+          {formatDisplayDate(appointment.date)}
           <Clock className="w-4 h-4 ml-4 mr-2" />
-          {formattedTime}
+          {appointment.time.substring(0, 5)}
         </div>
         <div className="flex items-center text-white/60">
           <MapPin className="w-4 h-4 mr-2" />
@@ -162,7 +210,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         >
           View Details
         </Button>
-        {statusLower === 'scheduled' && (
+        {appointment.status.toLowerCase() === 'scheduled' && (
           <div className="flex space-x-2">
             <Button 
               variant="primary" 

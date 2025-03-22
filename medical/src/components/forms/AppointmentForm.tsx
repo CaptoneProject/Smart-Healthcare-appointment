@@ -173,8 +173,18 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Log the date for debugging
+    console.log('Form date before submission:', formData.date);
+    
+    // Create a copy of the form data to prevent timezone issues
+    const submitData = {
+      ...formData,
+      // Ensure the date is kept exactly as selected without timezone conversion
+      date: formData.date
+    };
+    
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit(submitData);
     }
   };
   

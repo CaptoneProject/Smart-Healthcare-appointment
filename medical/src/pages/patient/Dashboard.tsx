@@ -35,13 +35,6 @@ interface AppointmentCardProps {
   status: string;
 }
 
-interface QuickActionCardProps {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  to: string;
-}
-
 interface Appointment {
   id: number;
   doctor: string;
@@ -106,17 +99,43 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ doctor, specialty, da
   </Card>
 );
 
-const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, description, to }) => (
-  <Link to={to} className="block">
-    <Card className="hover:bg-white/10 transition-all duration-300 h-full">
-      <div className="p-3 rounded-lg bg-blue-400/10 backdrop-blur-sm w-fit">
-        <Icon className="w-6 h-6 text-blue-400" />
+const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({ 
+  doctor, 
+  specialty, 
+  date,
+  time,
+  status
+}) => {
+  // Format the date without timezone conversion
+  const formatDate = (dateStr: string) => {
+    // Get components without timezone conversion
+    const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
+    
+    // Format as M/D/YYYY
+    return `${month}/${day}/${year}`;
+  };
+
+  return (
+    <Card>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="font-medium text-lg text-white/90">{doctor}</h3>
+          <p className="text-white/60">{specialty}</p>
+        </div>
+        <StatusBadge status={status} />
       </div>
-      <h3 className="font-medium mb-2 mt-4 text-white/90">{title}</h3>
-      <p className="text-sm text-white/60">{description}</p>
+      
+      <div className="pt-2 border-t border-white/10">
+        <div className="flex items-center text-white/60">
+          <Calendar className="w-4 h-4 mr-2" />
+          {formatDate(date)}
+          <Clock className="w-4 h-4 ml-4 mr-2" />
+          {time}
+        </div>
+      </div>
     </Card>
-  </Link>
-);
+  );
+};
 
 const PatientDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -219,28 +238,6 @@ const PatientDashboard: React.FC = () => {
     }
   ];
 
-  // Data for quick actions
-  const quickActions = [
-    {
-      icon: Calendar,
-      title: "Schedule Appointment",
-      description: "Book a new appointment with a doctor",
-      to: "/p/appointments/new"
-    },
-    {
-      icon: Pill,
-      title: "Request Refill",
-      description: "Request a prescription refill",
-      to: "/p/prescriptions"
-    },
-    {
-      icon: FileText,
-      title: "View Records",
-      description: "Access your medical records",
-      to: "/p/records"
-    }
-  ];
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -303,11 +300,11 @@ const PatientDashboard: React.FC = () => {
         ) : upcomingAppointments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {upcomingAppointments.slice(0, 2).map((appointment, index) => (
-              <AppointmentCard 
+              <DoctorAppointmentCard 
                 key={appointment.id || index}
                 doctor={appointment.doctor}
                 specialty={appointment.specialty}
-                date={new Date(appointment.date).toLocaleDateString()}
+                date={appointment.date} // Pass the date string directly
                 time={appointment.time}
                 status={appointment.status}
               />
@@ -327,33 +324,6 @@ const PatientDashboard: React.FC = () => {
             </Button>
           </Card>
         )}
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white/90">Quick Actions</h2>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Plus className="w-4 h-4" />}
-            as={Link}
-            to="/p/appointments/new"
-          >
-            New Appointment
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {quickActions.map((action, index) => (
-            <QuickActionCard 
-              key={index}
-              icon={action.icon}
-              title={action.title}
-              description={action.description}
-              to={action.to}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
