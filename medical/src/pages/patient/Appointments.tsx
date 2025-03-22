@@ -289,11 +289,19 @@ const PatientAppointments: React.FC = () => {
   });
 
   const filteredAppointments = appointments.filter(appointment => {
+    const appointmentDateTime = new Date(`${appointment.date} ${appointment.time}`);
+    const isUpcoming = appointmentDateTime > new Date();
+    const statusLower = appointment.status.toLowerCase();
+
     // Filter by status
     if (filter !== 'all') {
-      const isUpcoming = new Date(`${appointment.date} ${appointment.time}`) > new Date();
-      if (filter === 'upcoming' && !isUpcoming) return false;
-      if (filter === 'past' && isUpcoming) return false;
+      if (filter === 'upcoming') {
+        // Show only confirmed upcoming appointments
+        return isUpcoming && statusLower === 'confirmed';
+      }
+      if (filter === 'past') {
+        return !isUpcoming;
+      }
     }
     
     // Filter by search query
