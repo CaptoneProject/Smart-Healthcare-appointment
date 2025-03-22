@@ -5,20 +5,21 @@ import { Card } from './ui/Card';
 
 interface CalendarEvent {
   id: number;
-  date: Date;
+  date: string;
   title: string;
   type: string;
+  status: string;
 }
 
 interface CalendarProps {
-  events?: CalendarEvent[];
+  events: CalendarEvent[];
   onDateClick?: (date: Date) => void;
-  onEventClick?: (event: CalendarEvent) => void;
+  onEventClick: (event: CalendarEvent) => void;
   className?: string;
 }
 
 const Calendar: React.FC<CalendarProps> = ({
-  events = [],
+  events,
   onDateClick,
   onEventClick,
   className = ''
@@ -50,16 +51,42 @@ const Calendar: React.FC<CalendarProps> = ({
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  // Check if a date has events
+  // Helper: Parse a YYYY-MM-DD string and return a Date constructed in local time.
+  const parseDateWithoutTimezone = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Update the hasEvents function to handle date comparison correctly
   const hasEvents = (day: number): CalendarEvent[] => {
-    return events.filter(event => {
-      const eventDate = new Date(event.date);
-      return (
-        eventDate.getDate() === day &&
-        eventDate.getMonth() === currentDate.getMonth() &&
-        eventDate.getFullYear() === currentDate.getFullYear()
-      );
+    // Format the date string in YYYY-MM-DD format
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    // Compare with event dates directly (string comparison)
+    return events.filter(event => event.date === dateStr);
+  };
+
+  // Fix the getDateClass function to correctly compare dates
+  const getDateClass = (cellDateStr: string): string => {
+    // For direct string comparison with the event date
+    const eventsOnThisDay = events.filter(event => {
+      // Direct string comparison without any date manipulation
+      const eventDateStr = event.date;
+      const match = eventDateStr === cellDateStr;
+      console.log(`Comparing dates - Cell: ${cellDateStr}, Event: ${eventDateStr}, Match: ${match}`);
+      return match && event.status === 'confirmed';
     });
+    
+    // Check if today
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const isToday = todayStr === cellDateStr;
+    
+    if (eventsOnThisDay.length > 0) {
+      return 'bg-green-500/20 border border-green-500';
+    }
+    
+    return isToday ? 'bg-blue-500/10 border border-blue-500/30' : '';
   };
 
   // Check if date is today
@@ -85,53 +112,25 @@ const Calendar: React.FC<CalendarProps> = ({
       );
     }
 
-    // Add calendar days
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based
+    const cells = [];
+
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayEvents = hasEvents(day);
-      const dayHasEvents = dayEvents.length > 0;
-      
-      days.push(
-        <div 
-          key={`day-${day}`} 
-          className={`h-12 p-1 relative rounded hover:bg-white/5 transition-colors cursor-pointer ${
-            isToday(day) ? 'bg-blue-500/10 border border-blue-500/30' : ''
-          }`}
-          onClick={() => {
-            if (onDateClick) {
-              const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-              onDateClick(clickedDate);
-            }
-          }}
+      // Construct a string in YYYY-MM-DD format
+      const cellDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push(
+        <div
+          key={`day-${day}`}
+          className={`h-12 p-1 rounded cursor-pointer ${getDateClass(cellDateStr)}`}
+          onClick={() => onDateClick && onDateClick(parseDateWithoutTimezone(cellDateStr))}
         >
-          <span className={`block w-7 h-7 flex items-center justify-center rounded-full
-            ${isToday(day) ? 'bg-blue-500 text-white' : 'text-white/80'}`}>
-            {day}
-          </span>
-          
-          {dayHasEvents && (
-            <div className="absolute bottom-1 left-0 right-0 flex justify-center">
-              {dayEvents.length > 2 ? (
-                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5" />
-              ) : (
-                dayEvents.map((event, _) => (
-                  <span 
-                    key={`event-${event.id}`}
-                    className="w-1.5 h-1.5 bg-blue-400 rounded-full mx-0.5"
-                    title={event.title}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onEventClick) onEventClick(event);
-                    }}
-                  />
-                ))
-              )}
-            </div>
-          )}
+          {day}
         </div>
       );
     }
 
-    return days;
+    return cells;
   };
 
   return (

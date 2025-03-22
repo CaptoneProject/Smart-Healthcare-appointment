@@ -125,7 +125,7 @@ router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
     
-    // Keep the date as is, no timezone conversion needed
+    // Use the date exactly as provided without any conversion
     const formattedDate = date;
 
     // Check availability

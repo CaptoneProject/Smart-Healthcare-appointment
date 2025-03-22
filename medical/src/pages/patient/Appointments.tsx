@@ -252,7 +252,8 @@ const PatientAppointments: React.FC = () => {
         id: item.id,
         doctor: item.doctor_name,
         specialty: item.doctor_specialty || "Specialty not specified",
-        date: item.date, // Keep the original date from backend
+        // Keep the exact date string from backend without any conversion
+        date: item.date,
         time: item.time.substring(0, 5),
         location: item.location || "Main Clinic",
         status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
@@ -269,24 +270,18 @@ const PatientAppointments: React.FC = () => {
   };
 
   // Convert appointments to calendar events
-  const calendarEvents = appointments.map(appointment => {
-    // Parse date parts manually to avoid timezone shifts
-    const [year, month, day] = appointment.date.split('-');
-    // Create date using local timezone
-    const eventDate = new Date(
-      Number(year), 
-      Number(month) - 1, // Months are 0-based
-      Number(day),
-      12 // Set to noon to avoid any timezone issues
-    );
-    
-    return {
-      id: appointment.id,
-      date: eventDate,
-      title: `${appointment.time} - ${appointment.doctor}`,
-      type: appointment.type
-    };
-  });
+  const calendarEvents = appointments
+    .filter(appointment => appointment.status.toLowerCase() === 'confirmed')
+    .map(appointment => {
+      console.log('Event date:', appointment.date); // Debug line to verify format
+      return {
+        id: appointment.id,
+        date: appointment.date, // Keep as-is, don't manipulate
+        title: `${appointment.time} - ${appointment.doctor}`,
+        type: appointment.type,
+        status: 'confirmed'
+      };
+    });
 
   const filteredAppointments = appointments.filter(appointment => {
     const appointmentDateTime = new Date(`${appointment.date} ${appointment.time}`);
