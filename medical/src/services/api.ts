@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 // Base URL for all API requests
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Create axios instance with the correct base URL
 const api = axios.create({
@@ -141,7 +140,6 @@ export const appointmentService = {
     console.log('API date before sending:', data.date);
     
     // Fix for timezone shift: subtract one day to counter the timezone shift
-    let appointmentDate = data.date;
     
     // Check if the date is being shifted to the next day
     // This compensates for the timezone issue by shifting the date back

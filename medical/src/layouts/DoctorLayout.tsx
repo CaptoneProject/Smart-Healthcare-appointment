@@ -1,7 +1,6 @@
-import { Link, useLocation, Outlet, useNavigate, NavLink } from 'react-router-dom';
+import { Link, Outlet, useNavigate, NavLink } from 'react-router-dom';
 import { 
   Hospital, 
-  Layout, 
   Calendar, 
   FileText, 
   Users, 
@@ -15,7 +14,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const DoctorLayout = () => {
-  const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   

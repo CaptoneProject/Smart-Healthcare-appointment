@@ -1,4 +1,4 @@
-import React, { JSX, useEffect, useState } from 'react';
+import { JSX, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import PatientDashboard from './pages/patient/Dashboard';
@@ -13,7 +13,6 @@ import DoctorLayout from './layouts/DoctorLayout';
 import DoctorSchedule from './pages/doctor/Schedule';
 import DoctorCredentialsForm from './pages/doctor/CredentialsForm';
 import DoctorAppointments from './pages/doctor/Appointments';
-import { doctorService } from './services/api';
 import PendingApproval from './pages/doctor/PendingApproval';
 import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';

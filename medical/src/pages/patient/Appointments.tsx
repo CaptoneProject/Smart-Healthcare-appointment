@@ -21,12 +21,14 @@ import { useAuth } from '../../context/AuthContext';
 interface Appointment {
   id: number;
   doctor: string;
+  doctor_name?: string; // Add this property
   specialty: string;
   date: string;
   time: string;
   location: string;
   status: 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
   type: string;
+  notes?: string; // Also add this property since you're using it
 }
 
 interface AppointmentCardProps {
@@ -113,7 +115,12 @@ const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
   );
 };
 
-const AppointmentDetails = ({ appointment, onClose }) => {
+interface AppointmentDetailsProps {
+  appointment: Appointment;
+  onClose: () => void;
+}
+
+const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointment, onClose }) => {
   // Format the date properly
   const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -254,7 +261,8 @@ const PatientAppointments: React.FC = () => {
         time: item.time.substring(0, 5),
         location: item.location || "Main Clinic",
         status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
-        type: item.type || "Consultation"
+        type: item.type || "Consultation",
+        notes: item.notes // Add this property
       }));
       
       setAppointments(transformedData);

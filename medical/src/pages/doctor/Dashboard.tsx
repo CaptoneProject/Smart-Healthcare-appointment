@@ -8,13 +8,13 @@ import {
   User,
   LucideIcon
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
-import { doctorService, appointmentService } from '../../services/api';
+import { appointmentService } from '../../services/api';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -37,6 +37,16 @@ interface QuickActionCardProps {
   title: string;
   description: string;
   to: string;
+}
+
+// First, define an interface for the appointment data
+interface AppointmentData {
+  id: number;
+  patient_name: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
 }
 
 const DashboardCard: React.FC<DashboardCardProps> = ({ 
@@ -129,16 +139,18 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, de
 const DoctorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
+  // Remove unused navigate variable if not needed
+  // const navigate = useNavigate();
+  
+  // Either use error variable or remove it
   const [error, setError] = useState<string | null>(null);
-  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<AppointmentData[]>([]);
   const [stats, setStats] = useState({
     todayCount: 0,
     pendingCount: 0,
     newPatients: 0,
     pendingReports: 0
   });
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -162,7 +174,7 @@ const DoctorDashboard: React.FC = () => {
           endDate: endDate
         });
 
-        // Process appointments
+        // Process appointments with proper typing
         const processedAppointments = appointmentsData.map((appt: any) => ({
           id: appt.id,
           patient_name: appt.patient_name || 'Patient',
@@ -172,14 +184,15 @@ const DoctorDashboard: React.FC = () => {
           status: appt.status || 'Scheduled'
         }));
         
-        setTodayAppointments(processedAppointments.filter(appt => 
+        // Use the defined type for filter operations
+        setTodayAppointments(processedAppointments.filter((appt: AppointmentData) => 
           appt.date === today
         ));
         
-        // Update stats
+        // Update stats with proper typing
         setStats({
-          todayCount: processedAppointments.filter(appt => appt.date === today).length,
-          pendingCount: processedAppointments.filter(appt => {
+          todayCount: processedAppointments.filter((appt: AppointmentData) => appt.date === today).length,
+          pendingCount: processedAppointments.filter((appt: AppointmentData) => {
             // Include both scheduled AND pending appointments, regardless of date
             const status = appt.status.toLowerCase();
             return status === 'scheduled' || status === 'pending';
@@ -187,8 +200,8 @@ const DoctorDashboard: React.FC = () => {
           newPatients: 0, // Would come from patient API
           pendingReports: 0 // Would come from reports API
         });
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
@@ -197,6 +210,11 @@ const DoctorDashboard: React.FC = () => {
 
     fetchDashboardData();
   }, [user?.id]);
+
+  // Display error message if there is one
+  if (error) {
+    return <div className="p-6 text-red-500">{error}</div>;
+  }
 
   // Data for stats cards
   const dashboardStats = [
@@ -211,8 +229,8 @@ const DoctorDashboard: React.FC = () => {
       icon: Clock,
       title: "Pending Appointments",
       value: loading ? "..." : stats.pendingCount,
-      footer: "View pending",
-      link: "/d/appointments?filter=pending_approval" // Modified this line
+      footer: "View all",
+      link: "/d/appointments"
     },
     {
       icon: UserPlus,

@@ -21,7 +21,6 @@ interface CalendarProps {
 const Calendar: React.FC<CalendarProps> = ({
   events,
   onDateClick,
-  onEventClick,
   className = ''
 }) => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -58,13 +57,6 @@ const Calendar: React.FC<CalendarProps> = ({
   };
 
   // Update the hasEvents function to handle date comparison correctly
-  const hasEvents = (day: number): CalendarEvent[] => {
-    // Format the date string in YYYY-MM-DD format
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
-    // Compare with event dates directly (string comparison)
-    return events.filter(event => event.date === dateStr);
-  };
 
   // Update the getDateClass function with a more robust approach
   const getDateClass = (cellDateStr: string): string => {
@@ -93,14 +85,6 @@ const Calendar: React.FC<CalendarProps> = ({
   };
 
   // Check if date is today
-  const isToday = (day: number): boolean => {
-    const today = new Date();
-    return (
-      day === today.getDate() &&
-      currentDate.getMonth() === today.getMonth() &&
-      currentDate.getFullYear() === today.getFullYear()
-    );
-  };
 
   // Generate calendar days
   const renderCalendarDays = (): React.ReactElement[] => {

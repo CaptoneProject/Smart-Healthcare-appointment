@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { adminService, authService, doctorService } from '../services/api';
+import { authService, doctorService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types/user';
 

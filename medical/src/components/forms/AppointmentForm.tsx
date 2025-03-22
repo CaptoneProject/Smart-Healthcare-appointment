@@ -1,7 +1,6 @@
 // src/components/forms/AppointmentForm.tsx
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, FileText, MapPin } from 'lucide-react';
-import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { doctorService } from '../../services/api';
 

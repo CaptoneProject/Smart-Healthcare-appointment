@@ -2,13 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
-  Filter, 
-  Search, 
   FileText, 
-  User,
   MapPin,
-  Plus,
-  ArrowRight,
   CheckCircle,
   XCircle
 } from 'lucide-react';
@@ -111,64 +106,11 @@ const AppointmentDetailsModal: React.FC<{
   );
 };
 
-const AppointmentDetails: React.FC<{ appointment: Appointment, onClose: () => void }> = ({ 
-  appointment, 
-  onClose 
-}) => {
-  // Use direct string formatting to avoid timezone issues
-  const formatDisplayDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
-    
-    // Format without timezone conversion
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-  
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium text-white/90 mb-1">Appointment Details</h3>
-        <div className="space-y-4">
-          <div>
-            <h4 className="font-medium text-white/90">{appointment.patientName}</h4>
-            <p className="text-sm text-white/60">Patient</p>
-          </div>
-          
-          <StatusBadge status={appointment.status} />
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-white/60 text-sm mb-1">Date</p>
-              <p className="text-white/90">{formatDisplayDate(appointment.date)}</p>
-            </div>
-            
-            <div>
-              <p className="text-white/60 text-sm mb-1">Time</p>
-              <p className="text-white/90">{appointment.time}</p>
-            </div>
-            
-            {/* Rest of the component */}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
   appointment, 
   onViewDetails,
   onUpdateStatus
 }) => {
-  // Don't create a Date object - this avoids timezone issues
-  // Instead, directly format the date string
-  const formattedDate = appointment.date.split('-').reverse().join('/');
-  
   // Alternative method: Use this consistent date formatting approach
   const formatDisplayDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-');
@@ -245,7 +187,6 @@ const DoctorAppointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
 
   const fetchAppointments = async () => {
     if (!user?.id) return;

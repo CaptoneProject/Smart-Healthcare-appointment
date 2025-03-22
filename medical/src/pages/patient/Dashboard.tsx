@@ -7,17 +7,17 @@ import {
   Pill, 
   CreditCard,
   ArrowRight,
-  Plus,
   User,
   LucideIcon
-} from 'lucide-react';
+} 
+from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
-import { appointmentService, patientService } from '../../services/api';
+import { appointmentService } from '../../services/api';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -27,7 +27,9 @@ interface DashboardCardProps {
   link?: string;
 }
 
-interface AppointmentCardProps {
+
+// Add the missing interface
+interface DoctorAppointmentCardProps {
   doctor: string;
   specialty: string;
   date: string;
@@ -77,27 +79,6 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   </Card>
 );
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({ doctor, specialty, date, time, status }) => (
-  <Card>
-    <div className="flex justify-between items-start">
-      <div>
-        <h3 className="font-medium text-white/90">{doctor}</h3>
-        <p className="text-sm text-white/60">{specialty}</p>
-      </div>
-      <StatusBadge status={status} />
-    </div>
-    <div className="mt-4 flex items-center space-x-4">
-      <div className="flex items-center text-white/60 text-sm">
-        <Calendar className="w-4 h-4 mr-2" />
-        {date}
-      </div>
-      <div className="flex items-center text-white/60 text-sm">
-        <Clock className="w-4 h-4 mr-2" />
-        {time}
-      </div>
-    </div>
-  </Card>
-);
 
 const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({ 
   doctor, 
@@ -178,7 +159,7 @@ const PatientDashboard: React.FC = () => {
 
         // Filter only confirmed appointments for the counter
         const confirmedAppointments = formattedAppointments.filter(
-          appt => appt.status.toLowerCase() === 'confirmed'
+          (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
         );
         
         setAppointments(formattedAppointments);
@@ -203,7 +184,7 @@ const PatientDashboard: React.FC = () => {
 
   // Filter appointments for display in the appointments section
   const upcomingAppointments = appointments.filter(
-    appt => appt.status.toLowerCase() === 'confirmed'
+    (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
   );
 
   // Data for stats cards
