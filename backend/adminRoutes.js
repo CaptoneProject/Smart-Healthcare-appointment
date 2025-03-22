@@ -1,15 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
-
-// Database connection
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
+const db = require('./database');
 
 // Middleware to check if user is admin
 const isAdmin = (req, res, next) => {
@@ -40,7 +31,9 @@ router.get('/doctor-credentials', isAdmin, async (req, res) => {
         dc.specialization,
         dc.years_of_experience as "yearsOfExperience",
         dc.verification_status as status,
-        dc.created_at as "submittedAt"
+        dc.created_at as "submittedAt",
+        dc.biography,
+        dc.education_history as "educationHistory"
       FROM doctor_credentials dc
       JOIN users u ON dc.doctor_id = u.id
     `;
@@ -52,7 +45,7 @@ router.get('/doctor-credentials', isAdmin, async (req, res) => {
     
     query += ` ORDER BY dc.created_at DESC`;
     
-    const result = await pool.query(query);
+    const result = await db.query(query);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching doctor credentials:', error);
@@ -78,7 +71,7 @@ router.put('/doctor-credentials/status/:id', isAdmin, async (req, res) => {
       WHERE doctor_id = $2 
       RETURNING *`;
     
-    const updateResult = await pool.query(updateQuery, [status, id]);
+    const updateResult = await db.query(updateQuery, [status, id]);
     
     if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'Doctor credentials not found' });
@@ -98,18 +91,18 @@ router.put('/doctor-credentials/status/:id', isAdmin, async (req, res) => {
 router.get('/system-stats', isAdmin, async (req, res) => {
   try {
     // Get total users count
-    const usersResult = await pool.query(
+    const usersResult = await db.query(
       `SELECT COUNT(*) as count, user_type FROM users GROUP BY user_type`
     );
     
     // Get pending credentials count
-    const pendingResult = await pool.query(
+    const pendingResult = await db.query(
       `SELECT COUNT(*) as count FROM doctor_credentials WHERE verification_status = 'pending'`
     );
     
     // Get today's appointments count
     const today = new Date().toISOString().split('T')[0];
-    const appointmentsResult = await pool.query(
+    const appointmentsResult = await db.query(
       `SELECT COUNT(*) as count FROM appointments WHERE date = $1`,
       [today]
     );

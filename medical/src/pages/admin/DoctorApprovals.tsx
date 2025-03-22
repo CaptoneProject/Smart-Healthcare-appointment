@@ -26,6 +26,8 @@ interface DoctorCredential {
   yearsOfExperience: number;
   submittedAt: string;
   status: 'pending' | 'approved' | 'rejected';
+  biography: string;           // Add these fields
+  educationHistory: string;    // to match what doctors submit
 }
 
 const DoctorApprovals: React.FC = () => {
@@ -296,8 +298,7 @@ const DoctorApprovals: React.FC = () => {
                   <h4 className="font-medium text-white/90">Professional Biography</h4>
                 </div>
                 <p className="text-white/70">
-                  Dr. {selectedDoctor.doctorName} has been practicing medicine for {selectedDoctor.yearsOfExperience} years, 
-                  specializing in {selectedDoctor.specialization}. They've received recognition for their work in the field.
+                  {selectedDoctor.biography || 'No biography provided'}
                 </p>
               </div>
               
@@ -306,10 +307,8 @@ const DoctorApprovals: React.FC = () => {
                   <FileText className="w-5 h-5 text-blue-400 mr-2" />
                   <h4 className="font-medium text-white/90">Education & Training</h4>
                 </div>
-                <p className="text-white/70">
-                  MD from University Medical School<br />
-                  Residency at City Hospital<br />
-                  Fellowship in Advanced {selectedDoctor.specialization}
+                <p className="text-white/70 whitespace-pre-line">
+                  {selectedDoctor.educationHistory || 'No education history provided'}
                 </p>
               </div>
               
@@ -319,7 +318,7 @@ const DoctorApprovals: React.FC = () => {
                   <h4 className="font-medium text-white/90">Submission Information</h4>
                 </div>
                 <p className="text-white/70">
-                  Submitted on {new Date(selectedDoctor.submittedAt).toLocaleDateString()} at {new Date(selectedDoctor.submittedAt).toLocaleTimeString()}
+                  Submitted on {new Date(selectedDoctor.submittedAt).toLocaleDateString()}
                 </p>
               </div>
             </div>
