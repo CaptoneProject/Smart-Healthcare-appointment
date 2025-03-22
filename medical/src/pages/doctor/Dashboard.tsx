@@ -150,12 +150,16 @@ const DoctorDashboard: React.FC = () => {
         // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
         
-        // Fetch today's appointments
+        // Get all appointments including future ones
+        const futureDate = new Date();
+        futureDate.setMonth(futureDate.getMonth() + 3); // 3 months ahead
+        const endDate = futureDate.toISOString().split('T')[0];
+        
         const appointmentsData = await appointmentService.getAppointments({
           userId: user.id,
           userType: 'doctor',
           startDate: today,
-          endDate: today
+          endDate: endDate
         });
 
         // Process appointments
@@ -168,8 +172,21 @@ const DoctorDashboard: React.FC = () => {
           status: appt.status || 'Scheduled'
         }));
         
-        setTodayAppointments(processedAppointments);
+        setTodayAppointments(processedAppointments.filter(appt => 
+          appt.date === today
+        ));
         
+        // Update stats
+        setStats({
+          todayCount: processedAppointments.filter(appt => appt.date === today).length,
+          pendingCount: processedAppointments.filter(appt => {
+            // Include both scheduled AND pending appointments, regardless of date
+            const status = appt.status.toLowerCase();
+            return status === 'scheduled' || status === 'pending';
+          }).length,
+          newPatients: 0, // Would come from patient API
+          pendingReports: 0 // Would come from reports API
+        });
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setError('Failed to load dashboard data');
@@ -194,8 +211,8 @@ const DoctorDashboard: React.FC = () => {
       icon: Clock,
       title: "Pending Appointments",
       value: loading ? "..." : stats.pendingCount,
-      footer: "View all",
-      link: "/d/appointments"
+      footer: "View pending",
+      link: "/d/appointments?filter=pending_approval" // Modified this line
     },
     {
       icon: UserPlus,

@@ -20,6 +20,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Modal } from '../../components/ui/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
+import { useSearchParams } from 'react-router-dom';
 
 interface Appointment {
   id: number;
@@ -171,6 +172,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <CheckCircle className="w-4 h-4 mr-1" />
               Confirm
             </Button>
+            <Button 
+              variant="danger" 
+              size="sm"
+              onClick={() => onUpdateStatus(appointment.id, 'rejected')}
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Reject
+            </Button>
           </div>
         )}
       </div>
@@ -180,7 +189,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
 const DoctorAppointments: React.FC = () => {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past' | 'today'>('today');
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past' | 'today' | 'pending_approval'>('today');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
@@ -262,23 +272,52 @@ const DoctorAppointments: React.FC = () => {
     fetchAppointments();
   }, [user?.id, filter]);
 
+  useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam === 'pending_approval') {
+      setFilter('pending_approval');
+    }
+  }, [searchParams]);
+
   const getFilteredAppointments = () => {
     if (!appointments) return [];
     
-    // Apply search filter if there's a query
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const filteredAppointments = appointments.filter(appointment => {
+      const appointmentDate = new Date(appointment.date);
+      appointmentDate.setHours(0, 0, 0, 0);
+      const statusLower = appointment.status.toLowerCase();
+
+      switch (filter) {
+        case 'pending_approval':
+          return statusLower === 'scheduled';
+        case 'today':
+          return appointmentDate.getTime() === today.getTime();
+        case 'upcoming':
+          return appointmentDate > today && statusLower === 'confirmed';
+        case 'past':
+          return appointmentDate < today || statusLower === 'completed';
+        default:
+          return true;
+      }
+    });
+
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
-      return appointments.filter(appointment => (
+      return filteredAppointments.filter(appointment => (
         appointment.patient_name.toLowerCase().includes(searchLower) ||
         appointment.type.toLowerCase().includes(searchLower) ||
         appointment.location.toLowerCase().includes(searchLower)
       ));
     }
-    
-    return appointments;
+
+    return filteredAppointments;
   };
 
   const filterOptions = [
+    { id: 'pending_approval', label: 'Pending Approval' },
     { id: 'today', label: 'Today' },
     { id: 'upcoming', label: 'Upcoming' },
     { id: 'past', label: 'Past' },
@@ -327,7 +366,7 @@ const DoctorAppointments: React.FC = () => {
       {/* Filters */}
       <FilterBar 
         activeFilter={filter}
-        onFilterChange={(value) => setFilter(value as 'all' | 'upcoming' | 'past' | 'today')}
+        onFilterChange={(value) => setFilter(value as 'all' | 'upcoming' | 'past' | 'today' | 'pending_approval')}
         options={filterOptions}
         searchPlaceholder="Search patients..."
         onSearchChange={setSearchQuery}

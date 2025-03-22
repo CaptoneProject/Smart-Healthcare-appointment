@@ -138,7 +138,7 @@ export const appointmentService = {
   },
   
   createAppointment: async (data: any) => {
-    // Using /api/appointments
+    // Don't modify the date, send it as is
     const response = await api.post('/appointments', data);
     return response.data;
   },

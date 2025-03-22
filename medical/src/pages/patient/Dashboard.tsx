@@ -135,10 +135,9 @@ const PatientDashboard: React.FC = () => {
       
       setLoading(true);
       try {
-        // Fetch upcoming appointments
         const today = new Date().toISOString().split('T')[0];
         const futureDate = new Date();
-        futureDate.setMonth(futureDate.getMonth() + 3); // 3 months in future
+        futureDate.setMonth(futureDate.getMonth() + 3);
         const endDate = futureDate.toISOString().split('T')[0];
         
         const appointmentsData = await appointmentService.getAppointments({
@@ -148,25 +147,31 @@ const PatientDashboard: React.FC = () => {
           endDate: endDate
         });
         
-        // Process appointments data
+        // Process appointments data with proper date formatting
         const formattedAppointments = appointmentsData.map((appt: any) => ({
           id: appt.id,
           doctor: appt.doctor_name || 'Doctor',
           specialty: appt.specialty || 'Specialist',
-          date: new Date(appt.date).toLocaleDateString(),
+          date: new Date(appt.date).toISOString().split('T')[0], // Ensure consistent date format
           time: appt.time.substring(0, 5),
           status: appt.status
         }));
+
+        // Filter only confirmed appointments for the counter
+        const confirmedAppointments = formattedAppointments.filter(
+          appt => appt.status.toLowerCase() === 'confirmed'
+        );
         
         setAppointments(formattedAppointments);
         
-        // Update stats
+        // Update stats with only confirmed appointments
         setStats({
-          upcomingAppointments: formattedAppointments.length,
-          activePrescriptions: 0, // Would come from prescriptions API
-          recentDocuments: 0, // Would come from records API
-          pendingPayments: 0 // Would come from payments API
+          upcomingAppointments: confirmedAppointments.length,
+          activePrescriptions: 0,
+          recentDocuments: 0,
+          pendingPayments: 0
         });
+
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -176,6 +181,11 @@ const PatientDashboard: React.FC = () => {
     
     fetchDashboardData();
   }, [user?.id]);
+
+  // Filter appointments for display in the appointments section
+  const upcomingAppointments = appointments.filter(
+    appt => appt.status.toLowerCase() === 'confirmed'
+  );
 
   // Data for stats cards
   const dashboardStats = [
@@ -290,14 +300,14 @@ const PatientDashboard: React.FC = () => {
           <Card className="p-6 flex justify-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500/30 border-t-blue-500"></div>
           </Card>
-        ) : appointments.length > 0 ? (
+        ) : upcomingAppointments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {appointments.slice(0, 2).map((appointment, index) => (
+            {upcomingAppointments.slice(0, 2).map((appointment, index) => (
               <AppointmentCard 
                 key={appointment.id || index}
                 doctor={appointment.doctor}
                 specialty={appointment.specialty}
-                date={appointment.date}
+                date={new Date(appointment.date).toLocaleDateString()}
                 time={appointment.time}
                 status={appointment.status}
               />

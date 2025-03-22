@@ -571,7 +571,9 @@ router.get('/available-slots', async (req, res) => {
     // Get all existing appointments for this doctor on this date
     const appointmentsResult = await pool.query(
       `SELECT time FROM appointments 
-       WHERE doctor_id = $1 AND date = $2 AND status != 'cancelled'`,
+       WHERE doctor_id = $1 
+       AND date = $2 
+       AND status NOT IN ('rejected', 'cancelled')`, // Modified to exclude rejected and cancelled
       [doctorId, date]
     );
     

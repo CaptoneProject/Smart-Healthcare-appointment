@@ -26,7 +26,8 @@ const initTables = async () => {
       type VARCHAR(50),
       status VARCHAR(20) DEFAULT 'scheduled',
       notes TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS doctor_availability (
@@ -37,33 +38,52 @@ const initTables = async () => {
       end_time TIME
     );
   `);
+  
+  // Add column if it doesn't exist
+  try {
+    await pool.query(`
+      ALTER TABLE appointments 
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+  } catch (error) {
+    console.error('Error adding updated_at column:', error);
+  }
 };
 
 initTables();
 
-// Check doctor availability
+// Update checkAvailability function
 const checkAvailability = async (doctorId, date, time) => {
+  console.log('Checking availability for:', { doctorId, date, time });
+  
   const result = await pool.query(
-    `SELECT * FROM appointments 
+    `SELECT id, status 
+     FROM appointments 
      WHERE doctor_id = $1 
      AND date = $2 
      AND time = $3
-     AND status = 'scheduled'`,
+     AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
     [doctorId, date, time]
   );
+  
+  console.log('Availability check result:', result.rows);
   return result.rows.length === 0;
 };
 
-// GET /api/appointments
+// Fix the GET appointments query
 router.get('/', async (req, res) => {
   try {
     const { userId, userType, status, startDate, endDate } = req.query;
+
+    console.log('Fetching appointments with params:', { userId, userType, status, startDate, endDate });
 
     let query = `
       SELECT a.*, 
              p.name as patient_name, 
              d.name as doctor_name,
-             dc.specialization as specialty
+             dc.specialization as specialty,
+             a.status as current_status,
+             to_char(a.date, 'YYYY-MM-DD') as date
       FROM appointments a
       JOIN users p ON a.patient_id = p.id
       JOIN users d ON a.doctor_id = d.id
@@ -82,7 +102,6 @@ router.get('/', async (req, res) => {
       queryParams.push(userId);
     }
 
-    // If a status filter is provided
     if (status) {
       paramIndex++;
       query += ` AND a.status = $${paramIndex}`;
@@ -92,7 +111,9 @@ router.get('/', async (req, res) => {
     query += ' ORDER BY a.date, a.time';
 
     const result = await pool.query(query, queryParams);
+    console.log(`Found ${result.rows.length} appointments`);
     res.json(result.rows);
+
   } catch (error) {
     console.error('Error fetching appointments:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -103,20 +124,22 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
+    
+    // Keep the date as is, no timezone conversion needed
+    const formattedDate = date;
 
     // Check availability
-    const isAvailable = await checkAvailability(doctorId, date, time);
+    const isAvailable = await checkAvailability(doctorId, formattedDate, time);
     if (!isAvailable) {
       return res.status(400).json({ error: 'Time slot not available' });
     }
 
-    // Create appointment
     const result = await pool.query(
       `INSERT INTO appointments 
-       (patient_id, doctor_id, date, time, duration, type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (patient_id, doctor_id, date, time, duration, type, notes, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
        RETURNING id`,
-      [patientId, doctorId, date, time, duration, type, notes]
+      [patientId, doctorId, formattedDate, time, duration, type, notes]
     );
 
     // Send notification (implement your notification system here)
@@ -192,28 +215,60 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Add this route to handle appointment status updates
+// Update appointment status
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (!['pending', 'confirmed', 'completed', 'cancelled', 'scheduled'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status value' });
+    if (!['pending', 'confirmed', 'completed', 'cancelled', 'rejected', 'scheduled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
     }
-    
-    const result = await pool.query(
-      'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
+
+    // Simplified query without updated_at for now
+    await pool.query(
+      `UPDATE appointments 
+       SET status = $1
+       WHERE id = $2`,
       [status, id]
     );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Appointment not found' });
+
+    // If appointment is cancelled or rejected, the slot becomes available again
+    if (status === 'cancelled' || status === 'rejected') {
+      sendAppointmentNotification({
+        type: `APPOINTMENT_${status.toUpperCase()}`,
+        appointmentId: id
+      });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json({ message: 'Appointment status updated successfully' });
   } catch (error) {
     console.error('Error updating appointment status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update GET /available-slots endpoint
+router.get('/available-slots', async (req, res) => {
+  try {
+    const { doctorId, date } = req.query;
+    
+    // First get all booked appointments for that date
+    const bookedSlots = await pool.query(
+      `SELECT time 
+       FROM appointments 
+       WHERE doctor_id = $1 
+       AND date = $2 
+       AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
+      [doctorId, date]
+    );
+
+    console.log('Checking slots for date:', date); // Add for debugging
+    console.log('Booked slots:', bookedSlots.rows); // Add for debugging
+
+    // Rest of your available slots logic...
+  } catch (error) {
+    console.error('Error getting available slots:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
