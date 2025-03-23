@@ -5,8 +5,7 @@ import {
   UserCheck, 
   Users, 
   Settings, 
-  Bell, 
-  User,
+  Bell,
   LogOut,
   Shield
 } from 'lucide-react';
