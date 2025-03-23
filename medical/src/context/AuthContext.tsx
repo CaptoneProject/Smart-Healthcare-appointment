@@ -119,17 +119,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.register(userData);
       setUser(response.user);
       
-      if (response.user.userType === 'patient') {
-        navigate('/p/dashboard');
-      } else if (response.user.userType === 'doctor') {
-        const hasCredentials = await checkDoctorCredentials(response.user.id);
-        if (!hasCredentials) {
-          navigate('/d/credentials');
-          return;
-        }
-        navigate('/d/dashboard');
-      } else if (response.user.userType === 'provider') {
-        navigate('/provider/dashboard');
+      // Add admin case to the routing logic
+      switch (response.user.userType) {
+        case 'patient':
+          navigate('/p/dashboard');
+          break;
+        case 'doctor':
+          const hasCredentials = await checkDoctorCredentials(response.user.id);
+          if (!hasCredentials) {
+            navigate('/d/credentials');
+            return;
+          }
+          navigate('/d/dashboard');
+          break;
+        case 'admin':
+          navigate('/admin/dashboard'); // Add this case
+          break;
+        case 'provider':
+          navigate('/provider/dashboard');
+          break;
+        default:
+          navigate('/');
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');

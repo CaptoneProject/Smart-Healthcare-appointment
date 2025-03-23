@@ -57,10 +57,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   if (!isOpen) return null;
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    
+    // Password validation for registration
+    if (!isSignIn) {
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+      
+      if (!passwordRegex.test(formData.password)) {
+        setFormError('Password must be at least 8 characters long and include a number and special character');
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        setFormError('Passwords do not match');
+        return;
+      }
+    }
     
     try {
       if (isSignIn) {
@@ -109,20 +123,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     try {
       console.log(`Attempting quick navigation for ${userType}...`);
       
-      // Call your auth service to simulate login with the specific user type
       let loginResponse;
       if (userType === 'admin') {
         console.log('Logging in as admin...');
-        loginResponse = await login('admin@gmail.com', 'admin1');
+        // Updated password to meet requirements (8+ chars, number, special char)
+        loginResponse = await login('admin1@gmail.com', 'admin@@1');
         console.log('Admin login response:', loginResponse);
         
-        // Force navigation to avoid any middleware issues
         window.location.href = '/admin/dashboard';
         return;
       } else if (userType === 'doctor') {
-        loginResponse = await login('doctor3@gmail.com', 'doctor3');
+        loginResponse = await login('doctor1@gmail.com', 'Doctor@1');
       } else {
-        loginResponse = await login('testuser1@gmail.com', 'testuser1');
+        loginResponse = await login('patient1@gmail.com', 'patient@1');
       }
 
       // Check localStorage for token
@@ -268,6 +281,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               </div>
               {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
             </div>
+
+            {!isSignIn && (
+              <p className="text-xs text-white/60 mt-1">
+                Password must be at least 8 characters long and include a number and special character
+              </p>
+            )}
 
             {!isSignIn && (
               <div>
