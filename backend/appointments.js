@@ -47,14 +47,19 @@ const db = require('./database'); // This is the shared database configuration!
 const checkAvailability = async (doctorId, date, time) => {
   console.log('Checking availability for:', { doctorId, date, time });
   
+  // Ensure consistent time format - trim to HH:MM
+  const formattedTime = time.toString().substring(0, 5);
+  
+  console.log('Formatted time for check:', formattedTime);
+  
   const result = await db.query(
     `SELECT id, status 
      FROM appointments 
      WHERE doctor_id = $1 
      AND date = $2 
-     AND time = $3
-     AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
-    [doctorId, date, time]
+     AND time::text LIKE $3 || '%'
+     AND status NOT IN ('rejected', 'cancelled')`,
+    [doctorId, date, formattedTime]
   );
   
   console.log('Availability check result:', result.rows);
@@ -117,11 +122,18 @@ router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
     
+    console.log('Creating appointment with:', { date, time });
+    
     // Use the date exactly as provided without any conversion
     const formattedDate = date;
+    
+    // Ensure time is in the standard HH:MM format
+    const formattedTime = time.toString().substring(0, 5);
+    
+    console.log('Formatted for database:', { formattedDate, formattedTime });
 
     // Check availability
-    const isAvailable = await checkAvailability(doctorId, formattedDate, time);
+    const isAvailable = await checkAvailability(doctorId, formattedDate, formattedTime);
     if (!isAvailable) {
       return res.status(400).json({ error: 'Time slot not available' });
     }
@@ -131,7 +143,7 @@ router.post('/', async (req, res) => {
        (patient_id, doctor_id, date, time, duration, type, notes, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
        RETURNING id`,
-      [patientId, doctorId, formattedDate, time, duration, type, notes]
+      [patientId, doctorId, formattedDate, formattedTime, duration, type, notes]
     );
 
     // Send notification (implement your notification system here)
@@ -154,10 +166,13 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, time } = req.body;
+    const { date, time, doctorId } = req.body;
+    
+    // Ensure time is in the standard HH:MM format
+    const formattedTime = time.toString().substring(0, 5);
 
     // Check new time availability
-    const isAvailable = await checkAvailability(req.body.doctorId, date, time);
+    const isAvailable = await checkAvailability(doctorId, date, formattedTime);
     if (!isAvailable) {
       return res.status(400).json({ error: 'New time slot not available' });
     }
@@ -166,7 +181,7 @@ router.put('/:id', async (req, res) => {
       `UPDATE appointments 
        SET date = $1, time = $2, status = 'rescheduled'
        WHERE id = $3`,
-      [date, time, id]
+      [date, formattedTime, id]
     );
 
     // Send notification
@@ -240,27 +255,116 @@ router.put('/:id/status', async (req, res) => {
   }
 });
 
-// Update GET /available-slots endpoint
+// Get available time slots
 router.get('/available-slots', async (req, res) => {
   try {
     const { doctorId, date } = req.query;
     
-    // First get all booked appointments for that date
-    const bookedSlots = await db.query(
+    if (!doctorId || !date) {
+      return res.status(400).json({ error: 'Doctor ID and date are required' });
+    }
+    
+    console.log('Checking available slots for date:', date);
+    
+    // Get day of week (0-6, Sunday-Saturday)
+    const dayOfWeek = new Date(date + 'T00:00:00Z').getUTCDay();
+    
+    console.log('Day of week for requested date:', dayOfWeek);
+    
+    // Get the doctor's schedule for this day
+    const scheduleResult = await db.query(
+      `SELECT * FROM doctor_schedules 
+       WHERE doctor_id = $1 AND day_of_week = $2`,
+      [doctorId, dayOfWeek]
+    );
+    
+    if (scheduleResult.rows.length === 0) {
+      console.log('No schedule found for this day');
+      return res.json([]);  // No schedule for this day
+    }
+    
+    const schedule = scheduleResult.rows[0];
+    console.log('Found schedule:', schedule);
+    
+    // Get all existing appointments for this doctor on this date
+    const appointmentsResult = await db.query(
       `SELECT time 
        FROM appointments 
        WHERE doctor_id = $1 
        AND date = $2 
-       AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
+       AND status NOT IN ('rejected', 'cancelled')`,
       [doctorId, date]
     );
-
-    console.log('Checking slots for date:', date); // Add for debugging
-    console.log('Booked slots:', bookedSlots.rows); // Add for debugging
-
-    // Rest of your available slots logic...
+    
+    // Format booked times consistently in HH:MM format
+    const bookedTimes = appointmentsResult.rows.map(row => {
+      const timeStr = row.time.toString();
+      return timeStr.substring(0, 5);
+    });
+    
+    console.log('Booked times:', bookedTimes);
+    
+    // Generate available time slots
+    const availableSlots = [];
+    
+    // Parse start and end times consistently
+    let startTimeParts = schedule.start_time.toString().split(':');
+    let endTimeParts = schedule.end_time.toString().split(':');
+    
+    const startHour = parseInt(startTimeParts[0], 10);
+    const endHour = parseInt(endTimeParts[0], 10);
+    
+    // Handle break times if they exist
+    let breakStartHour = -1;
+    let breakEndHour = -1;
+    
+    if (schedule.break_start) {
+      let breakStartParts = schedule.break_start.toString().split(':');
+      breakStartHour = parseInt(breakStartParts[0], 10);
+    }
+    
+    if (schedule.break_end) {
+      let breakEndParts = schedule.break_end.toString().split(':');
+      breakEndHour = parseInt(breakEndParts[0], 10);
+    }
+    
+    // Calculate slots per hour based on max_patients
+    const slotsPerHour = Math.min(schedule.max_patients || 4, 4); // Cap at 4 slots per hour
+    const minutesPerSlot = 60 / slotsPerHour;
+    
+    console.log('Generating slots with:', {
+      startHour,
+      endHour,
+      breakStartHour,
+      breakEndHour,
+      slotsPerHour,
+      minutesPerSlot
+    });
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      // Skip break time
+      if (hour >= breakStartHour && hour < breakEndHour) continue;
+      
+      for (let slot = 0; slot < slotsPerHour; slot++) {
+        const minutes = Math.floor(slot * minutesPerSlot);
+        const timeString = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        
+        // Check if this time is already booked
+        const isBooked = bookedTimes.includes(timeString);
+        
+        if (!isBooked) {
+          availableSlots.push({
+            time: timeString,
+            available: true
+          });
+        }
+      }
+    }
+    
+    console.log(`Generated ${availableSlots.length} available slots`);
+    res.json(availableSlots);
   } catch (error) {
-    console.error('Error getting available slots:', error);
+    console.error('Error fetching available slots:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

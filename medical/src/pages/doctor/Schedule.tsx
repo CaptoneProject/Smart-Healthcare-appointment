@@ -28,6 +28,13 @@ const DoctorSchedule: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   
+  // Helper function to format time to HH:MM for consistency
+  const formatTimeForStorage = (timeString: string | undefined): string | undefined => {
+    if (!timeString) return undefined;
+    // Ensure time is in HH:MM format
+    return timeString.toString().substring(0, 5);
+  };
+  
   // Fetch doctor's schedule
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -84,11 +91,20 @@ const DoctorSchedule: React.FC = () => {
     if (!selectedSlot || !user?.id) return;
     
     try {
-      console.log('Submitting slot:', selectedSlot);
+      // Format all times to HH:MM format for consistent API submission
+      const formattedSlot = {
+        ...selectedSlot,
+        startTime: formatTimeForStorage(selectedSlot.startTime) || '',
+        endTime: formatTimeForStorage(selectedSlot.endTime) || '',
+        breakStart: formatTimeForStorage(selectedSlot.breakStart),
+        breakEnd: formatTimeForStorage(selectedSlot.breakEnd)
+      };
+      
+      console.log('Submitting slot with formatted times:', formattedSlot);
       
       if (selectedSlot.id) {
         // Update existing slot
-        const updatedSlot = await doctorService.updateScheduleSlot(user.id, selectedSlot);
+        const updatedSlot = await doctorService.updateScheduleSlot(user.id, formattedSlot);
         console.log('Slot updated:', updatedSlot);
         
         setSchedule(prevSchedule => 
@@ -98,7 +114,7 @@ const DoctorSchedule: React.FC = () => {
         );
       } else {
         // Add new slot
-        const newSlot = await doctorService.addScheduleSlot(user.id, selectedSlot);
+        const newSlot = await doctorService.addScheduleSlot(user.id, formattedSlot);
         console.log('New slot added:', newSlot);
         
         setSchedule(prevSchedule => [...prevSchedule, normalizeSlotData(newSlot)]);
@@ -114,33 +130,49 @@ const DoctorSchedule: React.FC = () => {
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    console.log(`Field changed: ${name} = ${value}`); // Add logging
+    console.log(`Field changed: ${name} = ${value}`);
     
     if (!selectedSlot) return;
     
-    // Force re-render by creating a completely new object
-    const updatedSlot = { ...selectedSlot };
-    
-    if (name === 'dayOfWeek' || name === 'maxPatients') {
+    // Format time values if they are time fields
+    if (name === 'startTime' || name === 'endTime' || name === 'breakStart' || name === 'breakEnd') {
+      // Force re-render by creating a completely new object
+      const updatedSlot = { ...selectedSlot };
+      
+      // Format time to HH:MM
+      (updatedSlot as any)[name] = formatTimeForStorage(value);
+      
+      console.log('Updated slot with formatted time:', updatedSlot);
+      setSelectedSlot(updatedSlot);
+    } else if (name === 'dayOfWeek' || name === 'maxPatients') {
+      // Handle numeric fields
+      const updatedSlot = { ...selectedSlot };
       (updatedSlot as any)[name] = parseInt(value, 10);
+      setSelectedSlot(updatedSlot);
     } else {
+      // Handle other fields
+      const updatedSlot = { ...selectedSlot };
       (updatedSlot as any)[name] = value;
+      setSelectedSlot(updatedSlot);
     }
-    
-    console.log('Updated slot:', updatedSlot); // Log the new slot object
-    setSelectedSlot(updatedSlot);
   };
 
   const normalizeSlotData = (slotData: any): TimeSlot => {
     return {
       id: slotData.id,
       dayOfWeek: slotData.day_of_week,
-      startTime: slotData.start_time.substring(0, 5), // Handle "09:00:00" format
-      endTime: slotData.end_time.substring(0, 5),
-      breakStart: slotData.break_start ? slotData.break_start.substring(0, 5) : undefined,
-      breakEnd: slotData.break_end ? slotData.break_end.substring(0, 5) : undefined,
+      startTime: formatTimeForStorage(slotData.start_time) || '', // Handle "09:00:00" format
+      endTime: formatTimeForStorage(slotData.end_time) || '',
+      breakStart: slotData.break_start ? formatTimeForStorage(slotData.break_start) : undefined,
+      breakEnd: slotData.break_end ? formatTimeForStorage(slotData.break_end) : undefined,
       maxPatients: slotData.max_patients
     };
+  };
+  
+  // Function to validate time input is in correct format
+  const validateTimeFormat = (timeString: string): boolean => {
+    const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+    return timePattern.test(timeString);
   };
   
   return (
@@ -274,7 +306,8 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.startTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                // Remove step to avoid potential browser issues
+                step="60" // 1-minute increments
+                pattern="[0-9]{2}:[0-9]{2}" // Force HH:MM format
               />
             </div>
             
@@ -286,7 +319,8 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.endTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="60" // 1-minute increments
+                pattern="[0-9]{2}:[0-9]{2}" // Force HH:MM format
               />
             </div>
           </div>
@@ -300,7 +334,8 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakStart || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="60" // 1-minute increments
+                pattern="[0-9]{2}:[0-9]{2}" // Force HH:MM format
               />
             </div>
             
@@ -312,7 +347,8 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakEnd || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="60" // 1-minute increments
+                pattern="[0-9]{2}:[0-9]{2}" // Force HH:MM format
               />
             </div>
           </div>
@@ -333,7 +369,7 @@ const DoctorSchedule: React.FC = () => {
           </div>
           
           <div className="flex justify-end">
-            <small className="text-white/40">Time format: HH:MM (12-hour)</small>
+            <small className="text-white/40">Time format: HH:MM</small>
           </div>
           
           <div className="pt-4 border-t border-white/10 flex justify-end space-x-2">

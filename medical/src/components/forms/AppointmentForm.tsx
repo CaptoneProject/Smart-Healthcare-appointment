@@ -112,7 +112,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
           setAvailabilityMessage('');
         }
         
-        setAvailableTimeSlots(response);
+        // Format time slots to ensure they're in HH:MM format
+        const formattedTimeSlots = response.map((slot: { time: string; available: boolean }) => ({
+          ...slot,
+          time: formatTimeForDisplay(slot.time)
+        }));
+        
+        setAvailableTimeSlots(formattedTimeSlots);
       } catch (error) {
         console.error('Error fetching available time slots:', error);
         setAvailableTimeSlots([]);
@@ -128,10 +134,18 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    // Format time to HH:MM when it's being set
+    if (name === 'time' && value) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: formatTimeForStorage(value)
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     // Clear errors for this field
     if (errors[name as keyof AppointmentFormData]) {
@@ -140,6 +154,18 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
         [name]: undefined
       }));
     }
+  };
+  
+  // Helper function to format time for storage and API submission
+  const formatTimeForStorage = (timeString: string): string => {
+    // Ensure time is in HH:MM format
+    return timeString.toString().substring(0, 5);
+  };
+  
+  // Helper function to format time for display
+  const formatTimeForDisplay = (timeString: string): string => {
+    // Ensure time is in HH:MM format
+    return timeString.toString().substring(0, 5);
   };
   
   const validateForm = (): boolean => {
@@ -155,6 +181,12 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     
     if (!formData.time) {
       newErrors.time = 'Please select a time';
+    } else {
+      // Validate time format
+      const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timePattern.test(formData.time)) {
+        newErrors.time = 'Invalid time format. Please use HH:MM format.';
+      }
     }
     
     if (!formData.type) {
@@ -172,14 +204,17 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Log the date for debugging
-    console.log('Form date before submission:', formData.date);
+    // Log the form data for debugging
+    console.log('Form data before submission:', {
+      ...formData,
+      time: formatTimeForStorage(formData.time)
+    });
     
-    // Create a copy of the form data to prevent timezone issues
+    // Create a copy of the form data with formatted values
     const submitData = {
       ...formData,
-      // Ensure the date is kept exactly as selected without timezone conversion
-      date: formData.date
+      date: formData.date, // Keep date as is
+      time: formatTimeForStorage(formData.time) // Ensure time is in HH:MM format
     };
     
     if (validateForm()) {

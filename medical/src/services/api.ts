@@ -11,6 +11,13 @@ const api = axios.create({
   }
 });
 
+// Helper function to format time to HH:MM for consistency
+const formatTime = (timeString: string | undefined): string | undefined => {
+  if (!timeString) return undefined;
+  // Ensure time is in HH:MM format
+  return timeString.toString().substring(0, 5);
+};
+
 // Ensure the api interceptor correctly sets Authorization header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
@@ -125,6 +132,17 @@ export const authService = {
       console.error('Error checking doctor status:', error);
       throw error;
     }
+  },
+  
+  // New method to verify password for medical records access
+  verifyAccessPassword: async (password: string) => {
+    try {
+      const response = await api.post('/auth/verify-password', { password });
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      throw error;
+    }
   }
 };
 
@@ -139,45 +157,44 @@ export const appointmentService = {
   createAppointment: async (data: any) => {
     console.log('API date before sending:', data.date);
     
-    // Fix for timezone shift: subtract one day to counter the timezone shift
+    // We no longer need to adjust the date - just keep it as is
+    const dateToSend = data.date;
     
-    // Check if the date is being shifted to the next day
-    // This compensates for the timezone issue by shifting the date back
-    const originalDate = new Date(data.date);
-    const dateToSend = new Date(originalDate);
-    dateToSend.setDate(dateToSend.getDate() - 1);
+    // Format time to HH:MM
+    const formattedTime = formatTime(data.time) || '';
     
-    // Format in YYYY-MM-DD
-    const fixedDate = dateToSend.toISOString().split('T')[0];
-    
-    console.log('Original selected date:', data.date);
-    console.log('Adjusted date to send:', fixedDate);
-    
-    // Send the adjusted date to counter the timezone shift
-    const response = await api.post('/appointments', {
-      ...data,
-      date: fixedDate // Send the fixed date
+    console.log('Formatted appointment data to send:', {
+      date: dateToSend,
+      time: formattedTime
     });
     
-    console.log('API response date:', response.data.date);
+    // Send with standardized format
+    const response = await api.post('/appointments', {
+      ...data,
+      date: dateToSend,
+      time: formattedTime
+    });
     
     return response.data;
   },
   
   rescheduleAppointment: async (id: any, data: any) => {
-    // Using /api/appointments/:id
-    const response = await api.put(`/appointments/${id}`, data);
+    // Format time to HH:MM before sending
+    const formattedData = {
+      ...data,
+      time: formatTime(data.time) || ''
+    };
+    
+    const response = await api.put(`/appointments/${id}`, formattedData);
     return response.data;
   },
   
   cancelAppointment: async (id: any) => {
-    // Using /api/appointments/:id
     const response = await api.delete(`/appointments/${id}`);
     return response.data;
   },
 
   updateAppointmentStatus: async (id: number, status: string) => {
-    // Using /api/appointments/:id/status
     const response = await api.put(`/appointments/${id}/status`, { status });
     return response.data;
   }
@@ -187,7 +204,20 @@ export const appointmentService = {
 export const doctorService = {
   setSchedule: async (doctorId: number, schedules: any[]) => {
     try {
-      const response = await api.post('/doctors/schedule', { doctorId, schedules });
+      // Format all times in the schedules
+      const formattedSchedules = schedules.map(schedule => ({
+        ...schedule,
+        startTime: formatTime(schedule.startTime) || '',
+        endTime: formatTime(schedule.endTime) || '',
+        breakStart: formatTime(schedule.breakStart),
+        breakEnd: formatTime(schedule.breakEnd)
+      }));
+      
+      const response = await api.post('/doctors/schedule', { 
+        doctorId, 
+        schedules: formattedSchedules 
+      });
+      
       return response.data;
     } catch (error) {
       throw error;
@@ -196,7 +226,6 @@ export const doctorService = {
   
   getSchedule: async (doctorId: number) => {
     try {
-      // Use the correct endpoint
       const response = await api.get(`/doctor/schedule/${doctorId}`);
       return response.data;
     } catch (error) {
@@ -284,15 +313,25 @@ export const doctorService = {
   
   addScheduleSlot: async (doctorId: number, slotData: any) => {
     try {
-      // Log the data being sent
-      console.log('Adding schedule slot:', { doctorId, ...slotData });
+      // Format all time fields to HH:MM
+      const formattedSlotData = {
+        ...slotData,
+        startTime: formatTime(slotData.startTime) || '',
+        endTime: formatTime(slotData.endTime) || '',
+        breakStart: formatTime(slotData.breakStart),
+        breakEnd: formatTime(slotData.breakEnd)
+      };
+      
+      console.log('Adding schedule slot with formatted times:', { 
+        doctorId, 
+        ...formattedSlotData 
+      });
       
       const response = await api.post('/doctor/schedule-slots', {
         doctorId,
-        ...slotData
+        ...formattedSlotData
       });
       
-      // Log the response
       console.log('Schedule slot added:', response.data);
       return response.data;
     } catch (error) {
@@ -303,10 +342,25 @@ export const doctorService = {
   
   updateScheduleSlot: async (doctorId: number, slotData: any) => {
     try {
+      // Format all time fields to HH:MM
+      const formattedSlotData = {
+        ...slotData,
+        startTime: formatTime(slotData.startTime) || '',
+        endTime: formatTime(slotData.endTime) || '',
+        breakStart: formatTime(slotData.breakStart),
+        breakEnd: formatTime(slotData.breakEnd)
+      };
+      
+      console.log('Updating schedule slot with formatted times:', {
+        doctorId,
+        ...formattedSlotData
+      });
+      
       const response = await api.put(`/doctor/schedule-slots/${slotData.id}`, {
         doctorId,
-        ...slotData
+        ...formattedSlotData
       });
+      
       return response.data;
     } catch (error) {
       console.error('Error updating schedule slot:', error);
@@ -344,10 +398,19 @@ export const doctorService = {
   
   getAvailableTimeSlots: async (doctorId: number, date: string) => {
     try {
+      console.log(`Fetching available slots for date: ${date}`);
       const response = await api.get('/doctor/available-slots', {
         params: { doctorId, date }
       });
-      return response.data;
+      
+      // Format the time slots consistently
+      const formattedSlots = response.data.map((slot: any) => ({
+        ...slot,
+        time: formatTime(slot.time) || ''
+      }));
+      
+      console.log(`Received ${formattedSlots.length} available slots`);
+      return formattedSlots;
     } catch (error) {
       console.error('Error fetching available time slots:', error);
       return [];
@@ -376,12 +439,54 @@ export const notificationService = {
   }
 };
 
+// Medical records services
+export const medicalRecordsService = {
+  verifyAccessPassword: async (password: string) => {
+    try {
+      const response = await api.post('/auth/verify-password', { password });
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying password for medical records:', error);
+      throw error;
+    }
+  },
+  
+  getUserMedicalRecords: async () => {
+    try {
+      const response = await api.get('/medical-records');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching medical records:', error);
+      throw error;
+    }
+  },
+  
+  getMedicalRecordById: async (recordId: number) => {
+    try {
+      const response = await api.get(`/medical-records/${recordId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching medical record:', error);
+      throw error;
+    }
+  },
+  
+  downloadRecordDocument: async (recordId: number) => {
+    try {
+      const response = await api.get(`/medical-records/${recordId}/download`);
+      return response.data;
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
+    }
+  }
+};
+
 // Admin services
 export const adminService = {
   getDoctorCredentials: async (filter: 'pending' | 'all' = 'pending') => {
     try {
       console.log(`Fetching doctor credentials with filter: ${filter}`);
-      // Remove the duplicate /api prefix
       const response = await api.get(`/admin/doctor-credentials?filter=${filter}`);
       return response.data;
     } catch (error: any) {
@@ -392,7 +497,6 @@ export const adminService = {
   
   updateDoctorStatus: async (doctorId: number, status: 'approved' | 'rejected', reason?: string) => {
     try {
-      // Fix: Change from doctor-credentials/:id to doctor-credentials/status/:id
       const response = await api.put(`/admin/doctor-credentials/status/${doctorId}`, {
         status,
         reason
@@ -406,7 +510,6 @@ export const adminService = {
   
   getSystemStats: async () => {
     try {
-      // Remove the duplicate /api prefix
       const response = await api.get('/admin/system-stats');
       return response.data;
     } catch (error) {

@@ -283,9 +283,13 @@ const DoctorAppointments: React.FC = () => {
         case 'pending_approval':
           return statusLower === 'scheduled';
         case 'today':
-          return appointmentDate.getTime() === today.getTime();
+          // Show both scheduled and confirmed appointments for today
+          return appointmentDate.getTime() === today.getTime() && 
+                 (statusLower === 'scheduled' || statusLower === 'confirmed');
         case 'upcoming':
-          return appointmentDate > today && statusLower === 'confirmed';
+          // Show both scheduled and confirmed upcoming appointments
+          return appointmentDate > today && 
+                 (statusLower === 'scheduled' || statusLower === 'confirmed');
         case 'past':
           return appointmentDate < today || statusLower === 'completed';
         default:
@@ -307,9 +311,9 @@ const DoctorAppointments: React.FC = () => {
 
   const filterOptions = [
     { id: 'pending_approval', label: 'Pending Approval' },
-    { id: 'today', label: 'Today' },
-    { id: 'upcoming', label: 'Upcoming' },
-    { id: 'past', label: 'Past' },
+    // { id: 'today', label: 'Today' },
+    // { id: 'upcoming', label: 'Upcoming' },
+    // { id: 'past', label: 'Past' },
     { id: 'all', label: 'All' }
   ];
 

@@ -139,10 +139,7 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, de
 const DoctorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
-  // Remove unused navigate variable if not needed
-  // const navigate = useNavigate();
   
-  // Either use error variable or remove it
   const [error, setError] = useState<string | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<AppointmentData[]>([]);
   const [stats, setStats] = useState({
@@ -183,15 +180,23 @@ const DoctorDashboard: React.FC = () => {
           type: appt.type || 'Consultation',
           status: appt.status || 'Scheduled'
         }));
+
+        console.log('All appointments fetched:', processedAppointments);
+        console.log('Today date for filtering:', today);
         
-        // Use the defined type for filter operations
-        setTodayAppointments(processedAppointments.filter((appt: AppointmentData) => 
-          appt.date === today
-        ));
+        // Show both scheduled and confirmed appointments for today
+        const todayAppts = processedAppointments.filter((appt: AppointmentData) => {
+          return appt.date === today && 
+                (appt.status.toLowerCase() === 'scheduled' || 
+                 appt.status.toLowerCase() === 'confirmed');
+        });
         
-        // Update stats with proper typing
+        console.log('Today appointments after filtering:', todayAppts);
+        setTodayAppointments(todayAppts);
+        
+        // Update stats with proper typing - include both scheduled and confirmed statuses
         setStats({
-          todayCount: processedAppointments.filter((appt: AppointmentData) => appt.date === today).length,
+          todayCount: todayAppts.length,
           pendingCount: processedAppointments.filter((appt: AppointmentData) => {
             // Include both scheduled AND pending appointments, regardless of date
             const status = appt.status.toLowerCase();

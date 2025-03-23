@@ -535,6 +535,7 @@ router.delete('/schedule-slots/:id', async (req, res) => {
 });
 
 // Get available time slots for a doctor on a specific date
+// Get available time slots for a doctor on a specific date
 router.get('/available-slots', async (req, res) => {
   try {
     const { doctorId, date } = req.query;
@@ -543,8 +544,13 @@ router.get('/available-slots', async (req, res) => {
       return res.status(400).json({ error: 'Doctor ID and date are required' });
     }
     
-    // Get day of week (0-6, Sunday-Saturday)
-    const dayOfWeek = new Date(date).getDay();
+    console.log('Fetching available slots for doctor:', doctorId, 'on date:', date);
+    
+    // Ensure consistent date handling - use UTC to avoid timezone issues
+    const requestDate = new Date(date + 'T00:00:00Z');
+    const dayOfWeek = requestDate.getUTCDay();
+    
+    console.log('Day of week calculated as:', dayOfWeek);
     
     // Get the doctor's schedule for this day
     const scheduleResult = await db.query(
@@ -554,45 +560,77 @@ router.get('/available-slots', async (req, res) => {
     );
     
     if (scheduleResult.rows.length === 0) {
+      console.log('No schedule found for this day');
       return res.json([]);  // No schedule for this day
     }
     
     const schedule = scheduleResult.rows[0];
+    console.log('Found schedule:', schedule);
     
     // Get all existing appointments for this doctor on this date
     const appointmentsResult = await db.query(
       `SELECT time FROM appointments 
        WHERE doctor_id = $1 
        AND date = $2 
-       AND status NOT IN ('rejected', 'cancelled')`, // Modified to exclude rejected and cancelled
+       AND status NOT IN ('rejected', 'cancelled')`,
       [doctorId, date]
     );
     
-    const bookedTimes = appointmentsResult.rows.map(row => row.time);
+    // Format booked times consistently in HH:MM format
+    const bookedTimes = appointmentsResult.rows.map(row => {
+      const timeStr = row.time.toString();
+      return timeStr.substring(0, 5);
+    });
     
-    // Generate available time slots
+    console.log('Booked times:', bookedTimes);
+    
+    // Generate available time slots with consistent formatting
     const availableSlots = [];
-    const startHour = parseInt(schedule.start_time.split(':')[0], 10);
-    const endHour = parseInt(schedule.end_time.split(':')[0], 10);
-    const breakStartHour = schedule.break_start ? parseInt(schedule.break_start.split(':')[0], 10) : -1;
-    const breakEndHour = schedule.break_end ? parseInt(schedule.break_end.split(':')[0], 10) : -1;
+    
+    // Parse start and end times consistently
+    let startTimeParts = schedule.start_time.toString().split(':');
+    let endTimeParts = schedule.end_time.toString().split(':');
+    
+    const startHour = parseInt(startTimeParts[0], 10);
+    const endHour = parseInt(endTimeParts[0], 10);
+    
+    // Handle break times if they exist
+    let breakStartHour = -1;
+    let breakEndHour = -1;
+    
+    if (schedule.break_start) {
+      let breakStartParts = schedule.break_start.toString().split(':');
+      breakStartHour = parseInt(breakStartParts[0], 10);
+    }
+    
+    if (schedule.break_end) {
+      let breakEndParts = schedule.break_end.toString().split(':');
+      breakEndHour = parseInt(breakEndParts[0], 10);
+    }
     
     // Calculate slots per hour based on max_patients
     const slotsPerHour = Math.min(schedule.max_patients || 4, 4); // Cap at 4 slots per hour
     const minutesPerSlot = 60 / slotsPerHour;
+    
+    console.log('Generating slots with:', {
+      startHour,
+      endHour,
+      breakStartHour,
+      breakEndHour,
+      slotsPerHour,
+      minutesPerSlot
+    });
     
     for (let hour = startHour; hour < endHour; hour++) {
       // Skip break time
       if (hour >= breakStartHour && hour < breakEndHour) continue;
       
       for (let slot = 0; slot < slotsPerHour; slot++) {
-        const minutes = slot * minutesPerSlot;
+        const minutes = Math.floor(slot * minutesPerSlot);
         const timeString = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         
         // Check if this time is already booked
-        const isBooked = bookedTimes.some(bookedTime => 
-          bookedTime.substring(0, 5) === timeString
-        );
+        const isBooked = bookedTimes.some(bookedTime => bookedTime === timeString);
         
         if (!isBooked) {
           availableSlots.push({
@@ -603,6 +641,7 @@ router.get('/available-slots', async (req, res) => {
       }
     }
     
+    console.log(`Generated ${availableSlots.length} available slots`);
     res.json(availableSlots);
   } catch (error) {
     console.error('Error fetching available time slots:', error);
