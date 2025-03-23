@@ -3,21 +3,21 @@ const router = express.Router();
 const nodemailer = require('nodemailer');
 const db = require('./database'); // Add this line to use the shared database module
 
-// Initialize tables
-const initTables = async () => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
-      type VARCHAR(50),
-      message TEXT,
-      is_read BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-};
+// // Initialize tables
+// const initTables = async () => {
+//   await db.query(`
+//     CREATE TABLE IF NOT EXISTS notifications (
+//       id SERIAL PRIMARY KEY,
+//       user_id INTEGER REFERENCES users(id),
+//       type VARCHAR(50),
+//       message TEXT,
+//       is_read BOOLEAN DEFAULT false,
+//       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//     );
+//   `);
+// };
 
-initTables();
+// initTables();
 
 // Email configuration
 const emailTransporter = nodemailer.createTransport({

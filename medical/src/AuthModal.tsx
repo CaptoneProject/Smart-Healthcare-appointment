@@ -272,8 +272,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 ? 'Processing...' 
                 : isSignIn ? 'Sign In' : 'Create Account'}
             </button>
-
-            {/* Remove the Development Quick Access Section */}
             
             {/* Toggle Sign In/Sign Up */}
             <p className="mt-6 text-center text-gray-300">
