@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { 
   UserCheck, 
-  UserX, 
   Eye,
   CheckCircle,
   XCircle,
@@ -108,10 +107,6 @@ const DoctorApprovals: React.FC = () => {
   };
 
   // Update the openConfirmationModal function to also set the selected doctor
-  const openConfirmationModal = (doctor: DoctorCredential) => {
-    setSelectedDoctor(doctor);
-    setIsConfirmingApproval(true);
-  };
   
   const handleReject = async () => {
     if (!selectedDoctor) return;
