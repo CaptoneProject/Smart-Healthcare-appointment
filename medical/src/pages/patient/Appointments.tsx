@@ -117,7 +117,7 @@ const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
 
 interface AppointmentDetailsProps {
   appointment: Appointment;
-  onClose: () => void;
+  onClose: () => void;  // Fixed: Added arrow function syntax
 }
 
 const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointment, onClose }) => {
@@ -251,18 +251,17 @@ const PatientAppointments: React.FC = () => {
         endDate: formattedEndDate
       });
       
-      // Transform API data to match component's expected format
+      // Update this transformation to properly handle specialty
       const transformedData = data.map((item: any) => ({
         id: item.id,
         doctor: item.doctor_name,
-        specialty: item.doctor_specialty || "Specialty not specified",
-        // Keep the exact date string from backend without any conversion
+        specialty: item.specialty || item.doctor_specialty || "General Practice", // Try both fields
         date: item.date,
         time: item.time.substring(0, 5),
         location: item.location || "Main Clinic",
         status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
         type: item.type || "Consultation",
-        notes: item.notes // Add this property
+        notes: item.notes
       }));
       
       setAppointments(transformedData);

@@ -66,13 +66,11 @@ router.get('/', async (req, res) => {
   try {
     const { userId, userType, status, startDate, endDate } = req.query;
 
-    console.log('Fetching appointments with params:', { userId, userType, status, startDate, endDate });
-
     let query = `
       SELECT a.*, 
              p.name as patient_name, 
              d.name as doctor_name,
-             dc.specialization as specialty,
+             dc.specialization as specialty,  -- Use SQL comment style
              a.status as current_status,
              to_char(a.date, 'YYYY-MM-DD') as date
       FROM appointments a
@@ -101,13 +99,16 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY a.date, a.time';
 
+    console.log('Final query:', query); // Debug log
+    console.log('Query params:', queryParams); // Debug log
+
     const result = await db.query(query, queryParams);
     console.log(`Found ${result.rows.length} appointments`);
     res.json(result.rows);
 
   } catch (error) {
-    console.error('Error fetching appointments:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', error); // Add detailed error logging
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

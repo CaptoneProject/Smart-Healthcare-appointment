@@ -147,12 +147,12 @@ const PatientDashboard: React.FC = () => {
           endDate: endDate
         });
         
-        // Process appointments data with proper date formatting
+        // Update appointment transformation to match
         const formattedAppointments = appointmentsData.map((appt: any) => ({
           id: appt.id,
           doctor: appt.doctor_name || 'Doctor',
-          specialty: appt.specialty || 'Specialist',
-          date: new Date(appt.date).toISOString().split('T')[0], // Ensure consistent date format
+          specialty: appt.specialty || appt.doctor_specialty || 'General Practice', // Match the format
+          date: new Date(appt.date).toISOString().split('T')[0],
           time: appt.time.substring(0, 5),
           status: appt.status
         }));
