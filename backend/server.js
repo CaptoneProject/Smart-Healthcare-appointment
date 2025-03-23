@@ -1,9 +1,11 @@
 require('dotenv').config();
 const express = require('express');
-const { Pool } = require('pg');
+// Remove the Pool import
+// const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const db = require('./database'); // Add the shared database module
 
 const app = express();
 
@@ -11,20 +13,11 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// PostgreSQL connection configuration
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
-
 // Initialize database tables
 async function initDatabase() {
   try {
     // Create users table
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
@@ -37,7 +30,7 @@ async function initDatabase() {
     `);
 
     // Create refresh_tokens table
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -115,7 +108,7 @@ app.post('/api/auth/refresh-token', async (req, res) => {
     );
 
     // Check if refresh token exists and is valid
-    const tokenResult = await pool.query(
+    const tokenResult = await db.query(
       'SELECT user_id FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()',
       [refreshToken]
     );
@@ -125,7 +118,7 @@ app.post('/api/auth/refresh-token', async (req, res) => {
     }
 
     // Get user details
-    const userResult = await pool.query(
+    const userResult = await db.query(
       'SELECT id, email, user_type FROM users WHERE id = $1',
       [decoded.userId]
     );
@@ -140,7 +133,7 @@ app.post('/api/auth/refresh-token', async (req, res) => {
     const tokens = generateTokens(user);
 
     // Update refresh token
-    await pool.query(
+    await db.query(
       'UPDATE refresh_tokens SET token = $1, expires_at = NOW() + INTERVAL \'7 days\' WHERE user_id = $2 AND token = $3',
       [tokens.refreshToken, user.id, refreshToken]
     );
@@ -162,7 +155,7 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     }
 
     // Remove refresh token
-    await pool.query(
+    await db.query(
       'DELETE FROM refresh_tokens WHERE user_id = $1 AND token = $2',
       [req.user.userId, refreshToken]
     );
@@ -177,7 +170,7 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
 // Get user profile endpoint
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT id, email, name, user_type, created_at FROM users WHERE id = $1',
       [req.user.userId]
     );
@@ -207,7 +200,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     const { name, currentPassword, newPassword } = req.body;
     
     // Get current user data
-    const userResult = await pool.query(
+    const userResult = await db.query(
       'SELECT password FROM users WHERE id = $1',
       [req.user.userId]
     );
@@ -226,7 +219,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await pool.query(
+      await db.query(
         'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
         [hashedPassword, req.user.userId]
       );
@@ -234,7 +227,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
 
     // Update name if provided
     if (name) {
-      await pool.query(
+      await db.query(
         'UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2',
         [name, req.user.userId]
       );

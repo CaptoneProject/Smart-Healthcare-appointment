@@ -1,21 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
-
-// Database connection - Match the format from server.js
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
+const db = require('./database'); // Add this line to use the shared database module
 
 // Initialize tables
 const initTables = async () => {
   try {
     // First check if the table exists with the old structure
-    const tableCheck = await pool.query(`
+    const tableCheck = await db.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'doctor_schedules' 
@@ -27,10 +18,10 @@ const initTables = async () => {
       console.log('Recreating doctor_schedules table with updated structure...');
       
       // Drop the old table if it exists (cascade to handle references)
-      await pool.query(`DROP TABLE IF EXISTS doctor_schedules CASCADE`);
+      await db.query(`DROP TABLE IF EXISTS doctor_schedules CASCADE`);
       
       // Create the table with the correct structure
-      await pool.query(`
+      await db.query(`
         CREATE TABLE doctor_schedules (
           id SERIAL PRIMARY KEY,
           doctor_id INTEGER REFERENCES users(id),
@@ -49,7 +40,7 @@ const initTables = async () => {
     }
     
     // Continue with other table creation...
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS patient_visits (
         id SERIAL PRIMARY KEY,
         patient_id INTEGER REFERENCES users(id),
@@ -107,14 +98,14 @@ router.post('/doctors/schedule', async (req, res) => {
     const { doctorId, schedules } = req.body;
 
     // Delete existing schedules
-    await pool.query(
+    await db.query(
       'DELETE FROM doctor_schedules WHERE doctor_id = $1',
       [doctorId]
     );
 
     // Insert new schedules
     for (const schedule of schedules) {
-      await pool.query(
+      await db.query(
         `INSERT INTO doctor_schedules 
          (doctor_id, day_of_week, start_time, end_time, break_start, break_end, max_patients)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -141,7 +132,7 @@ router.post('/doctors/schedule', async (req, res) => {
 router.get('/doctors/:id/schedule', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT * FROM doctor_schedules WHERE doctor_id = $1 ORDER BY day_of_week',
       [id]
     );
@@ -156,7 +147,7 @@ router.get('/doctors/:id/schedule', async (req, res) => {
 router.get('/schedule/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT * FROM doctor_schedules WHERE doctor_id = $1 ORDER BY day_of_week',
       [id]
     );
@@ -181,7 +172,7 @@ router.post('/visits', async (req, res) => {
       followUpDate
     } = req.body;
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO patient_visits 
        (patient_id, doctor_id, appointment_id, visit_date, visit_time,
         status, symptoms, diagnosis, prescription, notes, follow_up_date)
@@ -201,7 +192,7 @@ router.post('/visits', async (req, res) => {
     );
 
     // Update appointment status
-    await pool.query(
+    await db.query(
       'UPDATE appointments SET status = $1 WHERE id = $2',
       ['completed', appointmentId]
     );
@@ -220,7 +211,7 @@ router.post('/visits', async (req, res) => {
 router.get('/patients/:id/visits', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT v.*, d.name as doctor_name 
        FROM patient_visits v
        JOIN users d ON v.doctor_id = d.id
@@ -241,7 +232,7 @@ router.post('/doctors/leave', async (req, res) => {
     const { doctorId, startDate, endDate, leaveType, reason } = req.body;
 
     // Check for conflicting appointments
-    const conflictingAppointments = await pool.query(
+    const conflictingAppointments = await db.query(
       `SELECT COUNT(*) FROM appointments
        WHERE doctor_id = $1
        AND date BETWEEN $2 AND $3
@@ -255,7 +246,7 @@ router.post('/doctors/leave', async (req, res) => {
       });
     }
 
-    await pool.query(
+    await db.query(
       `INSERT INTO doctor_leaves 
        (doctor_id, start_date, end_date, leave_type, reason)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -275,7 +266,7 @@ router.get('/doctors/:id/daily-schedule', async (req, res) => {
     const { id } = req.params;
     const { date } = req.query;
 
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT a.*, p.name as patient_name, p.phone as patient_phone
        FROM appointments a
        JOIN users p ON a.patient_id = p.id
@@ -295,7 +286,7 @@ router.get('/doctors/:id/daily-schedule', async (req, res) => {
 router.get('/doctors', async (req, res) => {
   try {
     // Join with doctor_credentials to get the verification status
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT u.id, u.name, 
              COALESCE(d.specialization, 'General Practitioner') as specialty, 
              d.verification_status
@@ -332,7 +323,7 @@ router.post('/credentials', async (req, res) => {
     } = req.body;
 
     // Store in database with pending status
-    await pool.query(
+    await db.query(
       `INSERT INTO doctor_credentials 
        (doctor_id, degree, license_number, specialization, years_of_experience, 
         biography, education_history, verification_status)
@@ -365,7 +356,7 @@ router.get('/doctors/:id/credentials-status', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT id FROM doctor_credentials WHERE doctor_id = $1',
       [id]
     );
@@ -385,7 +376,7 @@ router.get('/credentials-status/:id', async (req, res) => {
     const { id } = req.params;
     
     // Check if doctor has submitted credentials
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT * FROM doctor_credentials 
        WHERE doctor_id = $1`,
       [id]
@@ -415,7 +406,7 @@ router.get('/status/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT verification_status as status
        FROM doctor_credentials 
        WHERE doctor_id = $1 
@@ -451,7 +442,7 @@ router.post('/schedule-slots', async (req, res) => {
       maxPatients
     } = req.body;
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO doctor_schedules 
        (doctor_id, day_of_week, start_time, end_time, break_start, break_end, max_patients)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -488,7 +479,7 @@ router.put('/schedule-slots/:id', async (req, res) => {
       maxPatients
     } = req.body;
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE doctor_schedules 
        SET day_of_week = $1, 
            start_time = $2, 
@@ -527,7 +518,7 @@ router.delete('/schedule-slots/:id', async (req, res) => {
     const { id } = req.params;
     const { doctorId } = req.query;
 
-    const result = await pool.query(
+    const result = await db.query(
       'DELETE FROM doctor_schedules WHERE id = $1 AND doctor_id = $2 RETURNING *',
       [id, doctorId]
     );
@@ -556,7 +547,7 @@ router.get('/available-slots', async (req, res) => {
     const dayOfWeek = new Date(date).getDay();
     
     // Get the doctor's schedule for this day
-    const scheduleResult = await pool.query(
+    const scheduleResult = await db.query(
       `SELECT * FROM doctor_schedules 
        WHERE doctor_id = $1 AND day_of_week = $2`,
       [doctorId, dayOfWeek]
@@ -569,7 +560,7 @@ router.get('/available-slots', async (req, res) => {
     const schedule = scheduleResult.rows[0];
     
     // Get all existing appointments for this doctor on this date
-    const appointmentsResult = await pool.query(
+    const appointmentsResult = await db.query(
       `SELECT time FROM appointments 
        WHERE doctor_id = $1 
        AND date = $2 

@@ -1,17 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-// Database connection
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
+const db = require('./database'); // Use the shared database module
 
 // Register route
 router.post('/register', async (req, res) => {
@@ -30,7 +21,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const userExists = await pool.query(
+    const userExists = await db.query( // Changed from pool.query to db.query
       'SELECT id FROM users WHERE email = $1',
       [email]
     );
@@ -43,7 +34,7 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new user
-    const result = await pool.query(
+    const result = await db.query( // Changed from pool.query to db.query
       'INSERT INTO users (email, password, name, user_type) VALUES ($1, $2, $3, $4) RETURNING id, email, user_type',
       [email, hashedPassword, name, userType]
     );
@@ -52,7 +43,7 @@ router.post('/register', async (req, res) => {
     const tokens = generateTokens(user);
 
     // Store refresh token
-    await pool.query(
+    await db.query( // Changed from pool.query to db.query
       'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
       [user.id, tokens.refreshToken]
     );
@@ -79,7 +70,7 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     
     // Find user
-    const userResult = await pool.query(
+    const userResult = await db.query( // Changed from pool.query to db.query
       'SELECT id, email, name, password, user_type FROM users WHERE email = $1',
       [email]
     );
@@ -99,7 +90,7 @@ router.post('/login', async (req, res) => {
     // For doctors, check their status
     let doctorStatus = null;
     if (user.user_type === 'doctor') {
-      const statusCheck = await pool.query(
+      const statusCheck = await db.query( // Changed from pool.query to db.query
         'SELECT verification_status FROM doctor_credentials WHERE doctor_id = $1 ORDER BY created_at DESC LIMIT 1',
         [user.id]
       );

@@ -1,21 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const moment = require('moment');
 const { sendAppointmentNotification } = require('./notifications');
-
-// Database connection - Match the format from server.js
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'smartcare',
-  password: process.env.DB_PASSWORD || 'vedang18',
-  port: process.env.DB_PORT || 5432,
-});
+const db = require('./database'); // This is the shared database configuration!
 
 // Initialize tables
 const initTables = async () => {
-  await pool.query(`
+  await db.query(`
     CREATE TABLE IF NOT EXISTS appointments (
       id SERIAL PRIMARY KEY,
       patient_id INTEGER REFERENCES users(id),
@@ -41,7 +32,7 @@ const initTables = async () => {
   
   // Add column if it doesn't exist
   try {
-    await pool.query(`
+    await db.query(`
       ALTER TABLE appointments 
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     `);
@@ -56,7 +47,7 @@ initTables();
 const checkAvailability = async (doctorId, date, time) => {
   console.log('Checking availability for:', { doctorId, date, time });
   
-  const result = await pool.query(
+  const result = await db.query(
     `SELECT id, status 
      FROM appointments 
      WHERE doctor_id = $1 
@@ -110,7 +101,7 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY a.date, a.time';
 
-    const result = await pool.query(query, queryParams);
+    const result = await db.query(query, queryParams);
     console.log(`Found ${result.rows.length} appointments`);
     res.json(result.rows);
 
@@ -134,7 +125,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Time slot not available' });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO appointments 
        (patient_id, doctor_id, date, time, duration, type, notes, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
@@ -170,7 +161,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'New time slot not available' });
     }
 
-    await pool.query(
+    await db.query(
       `UPDATE appointments 
        SET date = $1, time = $2, status = 'rescheduled'
        WHERE id = $3`,
@@ -195,7 +186,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query(
+    await db.query(
       `UPDATE appointments 
        SET status = 'cancelled'
        WHERE id = $1`,
@@ -226,7 +217,7 @@ router.put('/:id/status', async (req, res) => {
     }
 
     // Simplified query without updated_at for now
-    await pool.query(
+    await db.query(
       `UPDATE appointments 
        SET status = $1
        WHERE id = $2`,
@@ -254,7 +245,7 @@ router.get('/available-slots', async (req, res) => {
     const { doctorId, date } = req.query;
     
     // First get all booked appointments for that date
-    const bookedSlots = await pool.query(
+    const bookedSlots = await db.query(
       `SELECT time 
        FROM appointments 
        WHERE doctor_id = $1 
