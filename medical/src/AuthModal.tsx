@@ -126,7 +126,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       let loginResponse;
       if (userType === 'admin') {
         console.log('Logging in as admin...');
-        // Updated password to meet requirements (8+ chars, number, special char)
+        //  validation requirements (8+ chars, number, special char)
         loginResponse = await login('admin1@gmail.com', 'admin@@1');
         console.log('Admin login response:', loginResponse);
         

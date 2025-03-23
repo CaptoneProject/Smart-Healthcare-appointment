@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           navigate('/d/dashboard');
           break;
         case 'admin':
-          navigate('/admin/dashboard'); // Add this case
+          navigate('/admin/dashboard'); 
           break;
         case 'provider':
           navigate('/provider/dashboard');
