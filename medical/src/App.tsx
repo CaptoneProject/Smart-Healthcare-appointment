@@ -19,8 +19,9 @@ import AdminDashboard from './pages/admin/Dashboard';
 import DoctorApprovals from './pages/admin/DoctorApprovals';
 import ErrorBoundary from './components/ErrorBoundary';
 import AccountRejected from './pages/doctor/AccountRejected';
+import NotFound from './pages/NotFound'; // Import the new 404 page
 
-// Update the ProtectedRoute to handle admin routes with better logging
+// ProtectedRoute remains unchanged
 const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -31,7 +32,6 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
       if (!user) {
         navigate('/', { replace: true });
       } else if (user.userType !== userType) {
-        // Redirect to appropriate dashboard
         if (user.userType === 'patient') {
           navigate('/p/dashboard', { replace: true });
         } else if (user.userType === 'doctor') {
@@ -42,12 +42,10 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
           navigate('/', { replace: true });
         }
       } else if (user.userType === 'doctor') {
-        // Handle doctor routes based on status
         const isCredentialsRoute = location.pathname === '/d/credentials';
         const isPendingRoute = location.pathname === '/d/pending-approval';
         const isRejectedRoute = location.pathname === '/d/rejected';
 
-        // Use optional chaining to safely access doctorStatus
         switch (user?.doctorStatus) {
           case 'rejected':
             if (!isRejectedRoute) {
@@ -60,10 +58,8 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
             }
             break;
           case 'approved':
-            // Allow access to doctor dashboard and related routes
             break;
           default:
-            // If no status (new doctor), redirect to credentials form
             if (!isCredentialsRoute) {
               navigate('/d/credentials', { replace: true });
             }
@@ -80,7 +76,6 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
   return user && user.userType === userType ? children : null;
 };
 
-// Wrapper to apply AuthProvider only to the inner components
 const AppWithAuth = () => {
   return (
     <Routes>
@@ -109,7 +104,6 @@ const AppWithAuth = () => {
         <Route path="schedule" element={<DoctorSchedule />} />
         <Route path="credentials" element={<DoctorCredentialsForm />} />
         <Route path="appointments" element={<DoctorAppointments />} />
-        {/* Other doctor routes */}
       </Route>
       
       {/* Standalone doctor routes */}
@@ -136,11 +130,10 @@ const AppWithAuth = () => {
             <DoctorApprovals />
           </ErrorBoundary>
         } />
-        {/* Other admin routes */}
       </Route>
       
-      {/* Catch-all redirect to homepage */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* 404 Page */}
+      <Route path="*" element={<NotFound />} /> {/* Replace Navigate with NotFound */}
     </Routes>
   );
 };

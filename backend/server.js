@@ -1,11 +1,9 @@
 require('dotenv').config();
 const express = require('express');
-// Remove the Pool import
-// const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const db = require('./database'); // Add the shared database module
+const db = require('./database');
 
 const app = express();
 
@@ -16,7 +14,7 @@ app.use(cors());
 // Initialize database tables
 async function initDatabase() {
   try {
-    // Create users table
+    // Create all tables in the correct order
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -27,10 +25,7 @@ async function initDatabase() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // Create refresh_tokens table
-    await db.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -38,16 +33,78 @@ async function initDatabase() {
         expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS doctor_credentials (
+        id SERIAL PRIMARY KEY,
+        doctor_id INTEGER REFERENCES users(id) UNIQUE,
+        degree VARCHAR(100),
+        license_number VARCHAR(100),
+        specialization VARCHAR(100),
+        subspecialization VARCHAR(100),
+        years_of_experience INTEGER,
+        biography TEXT,
+        education_history TEXT,
+        verification_status VARCHAR(20) DEFAULT 'pending',
+        verified_by INTEGER,
+        verification_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS doctor_schedules (
+        id SERIAL PRIMARY KEY,
+        doctor_id INTEGER REFERENCES users(id),
+        day_of_week INTEGER,
+        start_time TIME,
+        end_time TIME,
+        break_start TIME,
+        break_end TIME,
+        max_patients INTEGER DEFAULT 4,
+        is_available BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS appointments (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES users(id),
+        doctor_id INTEGER REFERENCES users(id),
+        date DATE NOT NULL,
+        time TIME NOT NULL,
+        duration INTEGER NOT NULL,
+        type VARCHAR(50),
+        status VARCHAR(20) DEFAULT 'scheduled',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        type VARCHAR(50),
+        message TEXT,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS doctor_leaves (
+        id SERIAL PRIMARY KEY,
+        doctor_id INTEGER REFERENCES users(id),
+        start_date DATE,
+        end_date DATE,
+        leave_type VARCHAR(50),
+        reason TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
+    throw error;
   }
 }
-
-// Initialize database on startup
-initDatabase();
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -75,7 +132,7 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Generate JWT tokens function (still needed for refresh token endpoint)
+// Generate JWT tokens function
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
     { userId: user.id, email: user.email, userType: user.user_type },
@@ -256,8 +313,17 @@ app.use('/api/admin', authenticateToken, adminRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+// Initialize database before starting the server
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch(error => {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  });
 
 module.exports = app;

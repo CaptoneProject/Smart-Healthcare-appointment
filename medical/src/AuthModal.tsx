@@ -104,65 +104,28 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setFormError(null);
   };
 
-  // Quick navigation function for development
-  const handleQuickNavigation = async (userType: 'patient' | 'doctor' | 'admin') => {
-    try {
-      console.log(`Attempting quick navigation for ${userType}...`);
-      
-      // Call your auth service to simulate login with the specific user type
-      let loginResponse;
-      if (userType === 'admin') {
-        console.log('Logging in as admin...');
-        loginResponse = await login('admin@gmail.com', 'admin1');
-        console.log('Admin login response:', loginResponse);
-        
-        // Force navigation to avoid any middleware issues
-        window.location.href = '/admin/dashboard';
-        return;
-      } else if (userType === 'doctor') {
-        loginResponse = await login('doctor3@gmail.com', 'doctor3');
-      } else {
-        loginResponse = await login('testuser1@gmail.com', 'testuser1');
-      }
-
-      // Check localStorage for token
-      const token = localStorage.getItem('accessToken');
-      console.log('Token after login:', token ? 'Token exists' : 'No token');
-      const user = localStorage.getItem('user');
-      console.log('User from localStorage:', user);
-
-      // Normal navigation via React Router
-      const route = userType === 'patient' ? '/p/dashboard' : 
-                    userType === 'doctor' ? '/d/dashboard' : 
-                    '/admin/dashboard';
-      console.log(`Navigating to ${route}`);
-      navigate(route);
-      onClose();
-    } catch (error) {
-      console.error('Quick navigation error:', error);
-      setFormError('Failed to authenticate. Please try again.');
-    }
-  };
+  // Remove handleQuickNavigation function
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      {/* Backdrop - increased blur and opacity */}
+      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-xl"
         onClick={onClose}
       />
 
-      {/* Modal - increased opacity and blur */}
-      <div className="relative w-full max-w-md mx-4 bg-white/15 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl">
+      {/* Modal - Added max-height and overflow handling */}
+      <div className="relative w-full max-w-md mx-4 max-h-[90vh] bg-white/15 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col">
         {/* Close button */}
         <button 
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors"
+          className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors z-10"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-8">
+        {/* Added scroll container */}
+        <div className="p-8 overflow-y-auto custom-scrollbar">
           {/* Logo and Header */}
           <div className="flex items-center justify-center mb-6">
             <Hospital className="w-8 h-8 text-blue-500" />
@@ -310,45 +273,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 : isSignIn ? 'Sign In' : 'Create Account'}
             </button>
 
-            {/* Development Quick Access Section */}
-            <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400 mb-2">Development Quick Access</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickNavigation('patient')}
-                  className="bg-green-600/70 hover:bg-green-500 text-white text-xs py-1 px-2 rounded"
-                >
-                  Patient Portal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickNavigation('doctor')}
-                  className="bg-purple-600/70 hover:bg-purple-500 text-white text-xs py-1 px-2 rounded"
-                >
-                  Doctor Portal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickNavigation('admin')}
-                  className="bg-blue-600/70 hover:bg-blue-500 text-white text-xs py-1 px-2 rounded"
-                >
-                  Admin Portal
-                </button>
-              </div>
-            </div>
+            {/* Remove the Development Quick Access Section */}
+            
+            {/* Toggle Sign In/Sign Up */}
+            <p className="mt-6 text-center text-gray-300">
+              {isSignIn ? "Don't have an account? " : "Already have an account? "}
+              <button
+                onClick={toggleMode}
+                className="text-blue-400 hover:text-blue-300"
+              >
+                {isSignIn ? 'Sign Up' : 'Sign In'}
+              </button>
+            </p>
           </form>
-
-          {/* Toggle Sign In/Sign Up */}
-          <p className="mt-6 text-center text-gray-300">
-            {isSignIn ? "Don't have an account? " : "Already have an account? "}
-            <button
-              onClick={toggleMode}
-              className="text-blue-400 hover:text-blue-300"
-            >
-              {isSignIn ? 'Sign Up' : 'Sign In'}
-            </button>
-          </p>
         </div>
       </div>
     </div>
