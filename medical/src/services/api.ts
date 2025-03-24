@@ -337,14 +337,41 @@ export const doctorService = {
   }
 };
 
-// Notification services
+// Add this interface
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  type: string;
+  related_id?: number;
+}
+
+// Update the notification service
 export const notificationService = {
-  getNotifications: async (userId: number) => {
+  getNotifications: async (userId: number): Promise<Notification[]> => {
     try {
-      const response = await api.get('/notifications', { params: { userId } });
+      const response = await api.get('/notifications', { 
+        params: { userId } 
+      });
+      
+      // Add validation
+      if (!response.data) {
+        console.error('No data received from notifications endpoint');
+        return [];
+      }
+
+      // Ensure we got an array
+      if (!Array.isArray(response.data)) {
+        console.error('Expected array of notifications but got:', typeof response.data);
+        return [];
+      }
+
       return response.data;
     } catch (error) {
-      throw error;
+      console.error('Error fetching notifications:', error);
+      throw error; // Let component handle the error
     }
   },
   
@@ -353,6 +380,17 @@ export const notificationService = {
       const response = await api.put(`/notifications/${notificationId}/read`);
       return response.data;
     } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  },
+  
+  markAllAsRead: async (userId: number) => {
+    try {
+      const response = await api.put('/notifications/read-all', { userId });
+      return response.data;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
       throw error;
     }
   }

@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const moment = require('moment');
-const { sendAppointmentNotification } = require('./notifications');
+const notifications = require('./notifications');
+const { sendAppointmentNotification } = notifications;
 const db = require('./database'); // This is the shared database configuration!
 const { normalizeDate, normalizeTime } = require('./utils/dateTime');
 
@@ -12,7 +13,7 @@ const initTables = async () => {
       id SERIAL PRIMARY KEY,
       patient_id INTEGER REFERENCES users(id),
       doctor_id INTEGER REFERENCES users(id),
-      date DATE NOT NULL,
+
       time TIME NOT NULL,
       duration INTEGER NOT NULL, -- in minutes
       type VARCHAR(50),
@@ -135,6 +136,27 @@ router.post('/', async (req, res) => {
       [patientId, doctorId, normalizedDate, normalizedTime, duration, type, notes]
     );
 
+    // Add this after successful creation
+    await sendAppointmentNotification({
+      type: 'APPOINTMENT_SCHEDULED',
+      appointmentId: result.rows[0].id
+    });
+
+    // Add notification for both patient and doctor
+    await db.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_id)
+       VALUES 
+       ($1, 'APPOINTMENT_CREATED', 'New Appointment', $2, $3),
+       ($4, 'APPOINTMENT_CREATED', 'New Appointment', $5, $3)`,
+      [
+        req.body.patient_id,
+        `Appointment scheduled with Dr. ${req.body.doctor_name} for ${req.body.date} at ${req.body.time}`,
+        result.rows[0].id,
+        req.body.doctor_id,
+        `New appointment with patient ${req.body.patient_name} for ${req.body.date} at ${req.body.time}`
+      ]
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating appointment:', error);
@@ -217,13 +239,12 @@ router.put('/:id/status', async (req, res) => {
       [status, id]
     );
 
-    // If appointment is cancelled or rejected, the slot becomes available again
-    if (status === 'cancelled' || status === 'rejected') {
-      sendAppointmentNotification({
-        type: `APPOINTMENT_${status.toUpperCase()}`,
-        appointmentId: id
-      });
-    }
+    // Send appropriate notification based on status
+    const notificationType = `APPOINTMENT_${status.toUpperCase()}`;
+    await sendAppointmentNotification({
+      type: notificationType,
+      appointmentId: id
+    });
 
     res.json({ message: 'Appointment status updated successfully' });
   } catch (error) {
@@ -253,6 +274,24 @@ router.get('/available-slots', async (req, res) => {
     // Rest of your available slots logic...
   } catch (error) {
     console.error('Error getting available slots:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// In your cancellation route
+router.put('/:id/cancel', async (req, res) => {
+  try {
+    // ... existing cancellation code ...
+
+    await sendAppointmentNotification({
+      type: 'APPOINTMENT_CANCELLED',
+      appointmentId: id,
+      cancelledBy: req.user.userType // 'patient' or 'doctor'
+    });
+
+    res.json({ message: 'Appointment cancelled successfully' });
+  } catch (error) {
+    console.error('Error cancelling appointment:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

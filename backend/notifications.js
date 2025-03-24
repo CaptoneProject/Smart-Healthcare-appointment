@@ -4,20 +4,55 @@ const nodemailer = require('nodemailer');
 const db = require('./database'); // Add this line to use the shared database module
 const { formatDate, formatTime } = require('./utils/dateTime');
 
-// Initialize tables
-const initTables = async () => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
-      type VARCHAR(50),
-      message TEXT,
-      is_read BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+// Update the initNotificationsTable function
+const initNotificationsTable = async () => {
+  try {
+    // Drop the existing table first to avoid conflicts
+    await db.query('DROP TABLE IF EXISTS notifications CASCADE');
+    
+    // Create the table with all required columns
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(100) NOT NULL,
+        message TEXT NOT NULL,
+        related_id INTEGER,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Notifications table initialized successfully');
+  } catch (error) {
+    console.error('Error creating notifications table:', error);
+  }
 };
 
+// Add this to ensure the table is recreated with the correct schema
+initNotificationsTable();
+
+// Initialize tables
+const initTables = async () => {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(100) NOT NULL,
+        message TEXT NOT NULL,
+        related_id INTEGER,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (error) {
+    console.error('Error creating notifications table:', error);
+  }
+};
+
+// Call this when your server starts
 initTables();
 
 // Email configuration
@@ -100,26 +135,45 @@ const scheduleReminders = async () => {
 setInterval(scheduleReminders, 24 * 60 * 60 * 1000);
 
 // Get user notifications
-router.get('/notifications', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
+    console.log('Fetching notifications for userId:', userId);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
 
     const result = await db.query(
-      `SELECT * FROM notifications
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+      `SELECT 
+        id, 
+        type, 
+        title, 
+        message, 
+        is_read, 
+        created_at, 
+        related_id
+       FROM notifications 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC 
+       LIMIT 50`,
       [userId]
     );
 
-    res.json(result.rows);
+    console.log(`Found ${result.rows.length} notifications`);
+    return res.json(result.rows);
+
   } catch (error) {
-    console.error('Error fetching notifications:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching notifications:', error.message);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message 
+    });
   }
 });
 
 // Mark notification as read
-router.put('/notifications/:id/read', async (req, res) => {
+router.put('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -157,82 +211,159 @@ const getAppointmentDetails = async (appointmentId) => {
   }
 };
 
-// Create a notification in database
+// Update the createNotification function
 const createNotification = async (notification) => {
   try {
-    await db.query(
+    const result = await db.query(
       `INSERT INTO notifications
        (user_id, type, title, message, related_id, is_read)
-       VALUES ($1, $2, $3, $4, $5, false)`,
+       VALUES ($1, $2, $3, $4, $5, false)
+       RETURNING *`,
       [
         notification.userId,
         notification.type,
         notification.title,
         notification.message,
-        notification.relatedId
+        notification.relatedId || null
       ]
     );
+    console.log('Notification created:', result.rows[0]);
+    return result.rows[0];
   } catch (error) {
     console.error('Error creating notification:', error);
+    throw error;
   }
 };
 
-// Get notification title based on type
-const getNotificationTitle = (type) => {
+// Update the getNotificationTitle function to handle different recipients
+const getNotificationTitle = (type, isForDoctor = false) => {
   switch (type) {
-    case 'APPOINTMENT_CREATED':
-      return 'New Appointment';
-    case 'APPOINTMENT_RESCHEDULED':
-      return 'Appointment Rescheduled';
+    case 'APPOINTMENT_SCHEDULED':
+      return isForDoctor 
+        ? 'New Appointment Request' 
+        : 'Appointment Request Sent';
+      
+    case 'APPOINTMENT_CONFIRMED':
+      return isForDoctor 
+        ? 'Appointment Confirmed' 
+        : 'Appointment Confirmed';
+      
+    case 'APPOINTMENT_REJECTED':
+      return isForDoctor 
+        ? 'Appointment Rejected' 
+        : 'Appointment Rejected';
+      
     case 'APPOINTMENT_CANCELLED':
-      return 'Appointment Cancelled';
+      return isForDoctor 
+        ? 'Appointment Cancelled' 
+        : 'Appointment Cancelled';
+      
+    case 'APPOINTMENT_COMPLETED':
+      return isForDoctor 
+        ? 'Appointment Completed' 
+        : 'Appointment Completed';
+      
     default:
       return 'Appointment Update';
   }
 };
 
-// Get notification message based on type and appointment
-const getNotificationMessage = (type, appointment) => {
+// Update the getNotificationMessage function to handle different recipients
+const getNotificationMessage = (type, appointment, isForDoctor = false) => {
   const dateStr = formatDate(new Date(appointment.date));
   const timeStr = formatTime(appointment.time);
   
   switch (type) {
-    case 'APPOINTMENT_CREATED':
-      return `Appointment scheduled with Dr. ${appointment.doctor_name} on ${dateStr} at ${timeStr}`;
-    case 'APPOINTMENT_RESCHEDULED':
-      return `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled to ${dateStr} at ${timeStr}`;
+    case 'APPOINTMENT_SCHEDULED':
+      return isForDoctor
+        ? `New appointment request from ${appointment.patient_name} for ${dateStr} at ${timeStr}`
+        : `Your appointment request with Dr. ${appointment.doctor_name} for ${dateStr} at ${timeStr} has been sent. Waiting for confirmation.`;
+      
+    case 'APPOINTMENT_CONFIRMED':
+      return isForDoctor
+        ? `You have confirmed the appointment with ${appointment.patient_name} for ${dateStr} at ${timeStr}`
+        : `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} at ${timeStr} has been confirmed. You're all set!`;
+      
+    case 'APPOINTMENT_REJECTED':
+      return isForDoctor
+        ? `You have rejected the appointment request from ${appointment.patient_name} for ${dateStr} at ${timeStr}`
+        : `Your appointment request with Dr. ${appointment.doctor_name} for ${dateStr} at ${timeStr} was not approved. Please schedule another time.`;
+      
     case 'APPOINTMENT_CANCELLED':
-      return `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} has been cancelled`;
+      // Add who cancelled the appointment
+      if (appointment.cancelled_by === 'doctor') {
+        return isForDoctor
+          ? `You have cancelled the appointment with ${appointment.patient_name} for ${dateStr} at ${timeStr}`
+          : `Dr. ${appointment.doctor_name} has cancelled your appointment scheduled for ${dateStr} at ${timeStr}`;
+      } else {
+        return isForDoctor
+          ? `${appointment.patient_name} has cancelled their appointment scheduled for ${dateStr} at ${timeStr}`
+          : `You have cancelled your appointment with Dr. ${appointment.doctor_name} scheduled for ${dateStr} at ${timeStr}`;
+      }
+      
+    case 'APPOINTMENT_COMPLETED':
+      return isForDoctor
+        ? `You have marked the appointment with ${appointment.patient_name} on ${dateStr} as completed`
+        : `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} has been completed. Thank you for visiting!`;
+      
     default:
-      return `Your appointment with Dr. ${appointment.doctor_name} has been updated`;
+      return `Appointment status has been updated`;
   }
 };
 
-module.exports = router;
-module.exports.sendAppointmentNotification = async (data) => {
+// Add this endpoint to mark all notifications as read
+router.put('/read-all', async (req, res) => {
   try {
-    // Get appointment details
-    const appointment = await getAppointmentDetails(data.appointmentId);
-    if (!appointment) return;
+    const { userId } = req.body;
     
-    // Create notification for patient
-    await createNotification({
-      userId: appointment.patient_id,
-      type: data.type,
-      title: getNotificationTitle(data.type),
-      message: getNotificationMessage(data.type, appointment),
-      relatedId: data.appointmentId
-    });
-    
-    // Create notification for doctor
-    await createNotification({
-      userId: appointment.doctor_id,
-      type: data.type,
-      title: getNotificationTitle(data.type),
-      message: getNotificationMessage(data.type, appointment),
-      relatedId: data.appointmentId
-    });
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    await db.query(
+      `UPDATE notifications
+       SET is_read = true
+       WHERE user_id = $1 AND is_read = false`,
+      [userId]
+    );
+
+    res.json({ message: 'All notifications marked as read' });
   } catch (error) {
-    console.error('Error sending appointment notification:', error);
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = {
+  router,
+  sendAppointmentNotification: async (data) => {
+    try {
+      // Get appointment details
+      const appointment = await getAppointmentDetails(data.appointmentId);
+      if (!appointment) return;
+      
+      // Add cancelled_by to the appointment object
+      appointment.cancelled_by = data.cancelledBy || 'patient';
+      
+      // Create notification for patient
+      await createNotification({
+        userId: appointment.patient_id,
+        type: data.type,
+        title: getNotificationTitle(data.type, false), // For patient
+        message: getNotificationMessage(data.type, appointment, false),
+        relatedId: data.appointmentId
+      });
+      
+      // Create notification for doctor
+      await createNotification({
+        userId: appointment.doctor_id,
+        type: data.type,
+        title: getNotificationTitle(data.type, true), // For doctor
+        message: getNotificationMessage(data.type, appointment, true),
+        relatedId: data.appointmentId
+      });
+    } catch (error) {
+      console.error('Error sending appointment notification:', error);
+    }
   }
 };

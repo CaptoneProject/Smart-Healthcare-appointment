@@ -4,18 +4,20 @@ import {
   Calendar, 
   FileText, 
   Users, 
-  MessageSquare, 
-  Bell, 
   User,
   LogOut,
   Clock,
-  Home
+  Home,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from '../components/ui/NotificationBell';
+import { useState } from 'react';
 
 const DoctorLayout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const navigationItems = [
     { path: '/d/dashboard', label: 'Dashboard', icon: Home },
@@ -90,16 +92,18 @@ const DoctorLayout = () => {
       {/* Main Content */}
       <main className="ml-64 min-h-screen bg-slate-950 text-white">
         {/* Top Bar */}
-        <header className="h-16 border-b border-white/10 bg-slate-900/50 backdrop-blur-lg px-8 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Doctor Portal</h1>
+        <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-400 hover:text-white transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-white transition-colors">
-              <MessageSquare className="w-5 h-5" />
-            </button>
+            <Menu
+              className="w-6 h-6 text-white/70 cursor-pointer block lg:hidden" 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            />
+            <h1 className="text-xl font-semibold text-white/90">SmartCare</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <NotificationBell />
+            {/* Any other header elements */}
           </div>
         </header>
 

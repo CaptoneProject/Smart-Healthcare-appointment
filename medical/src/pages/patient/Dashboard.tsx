@@ -8,17 +8,18 @@ import {
   CreditCard,
   ArrowRight,
   User,
-  LucideIcon
+  LucideIcon,
+  Bell
 } 
 from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
-import { formatDate } from '../../utils/dateTime';
+import { formatDate, formatFullDate, formatTime } from '../../utils/dateTime';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -113,6 +114,7 @@ const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({
 
 const PatientDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [stats, setStats] = useState({
@@ -251,6 +253,39 @@ const PatientDashboard: React.FC = () => {
           />
         ))}
       </div>
+
+      {/* Appointment Reminders */}
+      {upcomingAppointments.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center mb-4">
+            <Bell className="w-5 h-5 text-yellow-400 mr-2" />
+            <h2 className="text-xl font-semibold text-white/90">Appointment Reminders</h2>
+          </div>
+          <Card className="p-4 border-l-4 border-yellow-500">
+            <div className="flex flex-col space-y-4">
+              {upcomingAppointments.slice(0, 1).map((appointment) => (
+                <div key={appointment.id} className="flex items-center">
+                  <div className="flex-1">
+                    <p className="text-white/90 font-medium">
+                      You have an appointment with Dr. {appointment.doctor}
+                    </p>
+                    <p className="text-white/60 text-sm mt-1">
+                      {formatFullDate(appointment.date)} at {formatTime(appointment.time)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate('/p/appointments')}
+                  >
+                    View Details
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Appointments Section */}
       <div>

@@ -6,15 +6,17 @@ import {
   FileText, 
   ArrowRight,
   User,
-  LucideIcon
+  LucideIcon,
+  Bell
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
+import { formatTime } from '../../utils/dateTime';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -139,8 +141,7 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({ icon: Icon, title, de
 const DoctorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
-  // Remove unused navigate variable if not needed
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   
   // Either use error variable or remove it
   const [error, setError] = useState<string | null>(null);
@@ -355,6 +356,39 @@ const DoctorDashboard: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Appointment Notifications */}
+      {todayAppointments.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center mb-4">
+            <Bell className="w-5 h-5 text-yellow-400 mr-2" />
+            <h2 className="text-xl font-semibold text-white/90">Today's Reminders</h2>
+          </div>
+          <Card className="p-4 border-l-4 border-yellow-500">
+            <div className="flex flex-col space-y-4">
+              {todayAppointments.slice(0, 1).map((appointment) => (
+                <div key={appointment.id} className="flex items-center">
+                  <div className="flex-1">
+                    <p className="text-white/90 font-medium">
+                      You have an appointment with {appointment.patient_name}
+                    </p>
+                    <p className="text-white/60 text-sm mt-1">
+                      Today at {formatTime(appointment.time)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate('/d/appointments')}
+                  >
+                    View Schedule
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div>

@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./database'); // Add the shared database module
+const notificationsRouter = require('./notifications').router; // Change this line
 
 const app = express();
 
@@ -244,15 +245,24 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
 const authRoutes = require('./auth');
 const appointmentsRoutes = require('./appointments');
 const doctorSchedulingRoutes = require('./doctorScheduling');
-const notificationsRoutes = require('./notifications');
 const adminRoutes = require('./adminRoutes');
 
 // Use routers
 app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/doctor', doctorSchedulingRoutes);
-app.use('/api/notifications', notificationsRoutes); 
+app.use('/api/notifications', notificationsRouter);
+
 app.use('/api/admin', authenticateToken, adminRoutes);
+
+// Add this after all your routes
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error', 
+    details: err.message 
+  });
+});
 
 // Start server
 const PORT = process.env.PORT || 3000;

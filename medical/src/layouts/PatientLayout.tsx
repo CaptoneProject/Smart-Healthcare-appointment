@@ -6,11 +6,11 @@ import {
   FileText, 
   Pill, 
   CreditCard, 
-  Bell, 
   User,
   LogOut 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from '../components/ui/NotificationBell';
 
 const PatientLayout = () => {
   const location = useLocation();
@@ -89,13 +89,14 @@ const PatientLayout = () => {
       {/* Main Content */}
       <main className="ml-64 min-h-screen bg-slate-950 text-white">
         {/* Top Bar */}
-        <header className="h-16 border-b border-white/10 bg-slate-900/50 backdrop-blur-lg px-8 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Dashboard</h1>
+        <header className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-400 hover:text-white transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
-            </button>
+            <h1 className="text-xl font-semibold text-white/90">SmartCare</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <NotificationBell />
+            {/* Any other header elements */}
           </div>
         </header>
 
