@@ -200,56 +200,131 @@ const DoctorSchedule: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {DAYS.map((day, index) => {
             const daySlots = schedule.filter(slot => slot.dayOfWeek === index);
-            if (daySlots.length === 0) return null;
             
             return (
-              <Card key={day} className="p-6">
-                <h3 className="text-lg font-medium text-white/90 mb-4">{day}</h3>
+              <Card key={day} className="overflow-hidden">
+                {/* Day header - centered alignment */}
+                <div className="bg-slate-800 p-3 border-b border-white/10 text-center">
+                  <h3 className="text-base font-semibold text-white/90">{day}</h3>
+                </div>
                 
-                {daySlots.map(slot => (
-                  <div key={slot.id} className="mb-4 p-4 bg-white/5 rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center text-white/90">
-                        <Clock className="w-4 h-4 mr-2 text-blue-400" />
-                        <span>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => handleEditSlot(slot)}
-                          className="p-1 text-white/60 hover:text-white/90 transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteSlot(slot.id)}
-                          className="p-1 text-white/60 hover:text-red-400 transition-colors"
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
-                      </div>
+                {/* Day content - reduced padding */}
+                <div className="p-3">
+                  {daySlots.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-[100px] py-2">
+                      <p className="text-xs text-white/40 mb-2">No time slots</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedSlot({
+                            dayOfWeek: index,
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            breakStart: '12:00',
+                            breakEnd: '13:00',
+                            maxPatients: 4
+                          });
+                          setIsModalOpen(true);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add slot
+                      </Button>
                     </div>
-                    
-                    {slot.breakStart && slot.breakEnd && (
-                      <div className="text-sm text-white/60 mb-1">
-                        Break: {formatTime(slot.breakStart)} - {formatTime(slot.breakEnd)}
-                      </div>
-                    )}
-                    
-                    <div className="text-sm text-white/60">
-                      Max {slot.maxPatients} patients per hour
+                  ) : (
+                    <div className="space-y-3">
+                      {daySlots.map(slot => (
+                        <div 
+                          key={slot.id} 
+                          className="border border-white/10 rounded-md hover:border-white/20 transition-colors"
+                        >
+                          {/* Time header - improved text size and spacing */}
+                          <div className="flex justify-between items-center p-2.5 border-b border-white/5 bg-white/5">
+                            <div className="flex items-center text-white/90">
+                              <Clock className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0" />
+                              <span className="text-sm font-medium">
+                                {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                              </span>
+                            </div>
+                            <div className="flex flex-shrink-0">
+                              <button 
+                                onClick={() => handleEditSlot(slot)}
+                                className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteSlot(slot.id)}
+                                className="p-1 rounded-md text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors ml-1"
+                                title="Delete"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* Slot details - improved text sizing and spacing */}
+                          <div className="p-3 bg-transparent text-left space-y-2">
+                            {slot.breakStart && slot.breakEnd && (
+                              <div className="flex items-start">
+                                <span className="w-2 h-2 bg-yellow-500/70 rounded-full mr-2 flex-shrink-0 mt-1" />
+                                <div>
+                                  <span className="text-sm text-white/60">Break: </span>
+                                  <span className="text-sm text-white/50">
+                                    {formatTime(slot.breakStart)} - {formatTime(slot.breakEnd)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-start">
+                              <span className="w-2 h-2 bg-green-500/70 rounded-full mr-2 flex-shrink-0 mt-1" />
+                              <div>
+                                <span className="text-sm text-white/60">Capacity: </span>
+                                <span className="text-sm text-white/50">
+                                  {slot.maxPatients} patients/hour
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Add another slot button - smaller */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-center text-white/50 hover:text-white/80 border border-dashed border-white/10 hover:border-white/20 py-1"
+                        onClick={() => {
+                          setSelectedSlot({
+                            dayOfWeek: index,
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            breakStart: '12:00',
+                            breakEnd: '13:00',
+                            maxPatients: 4
+                          });
+                          setIsModalOpen(true);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add slot
+                      </Button>
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
               </Card>
             );
           })}
         </div>
       )}
       
-      {/* Add/Edit Time Slot Modal */}
+      {/* Modal remains the same */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
