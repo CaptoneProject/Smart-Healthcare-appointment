@@ -18,6 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
+import { formatDate } from '../../utils/dateTime';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -87,15 +88,7 @@ const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({
   time,
   status
 }) => {
-  // Format the date without timezone conversion
-  const formatDate = (dateStr: string) => {
-    // Get components without timezone conversion
-    const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
-    
-    // Format as M/D/YYYY
-    return `${month}/${day}/${year}`;
-  };
-
+  // Remove the old formatDate function and use our utility
   return (
     <Card>
       <div className="flex justify-between items-start mb-4">
@@ -109,7 +102,7 @@ const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({
       <div className="pt-2 border-t border-white/10">
         <div className="flex items-center text-white/60">
           <Calendar className="w-4 h-4 mr-2" />
-          {formatDate(date)}
+          {formatDate(date)} {/* Use our formatDate utility */}
           <Clock className="w-4 h-4 ml-4 mr-2" />
           {time}
         </div>
@@ -147,22 +140,22 @@ const PatientDashboard: React.FC = () => {
           endDate: endDate
         });
         
-        // Update appointment transformation to match
+        // Update appointment transformation to prevent date shift
         const formattedAppointments = appointmentsData.map((appt: any) => ({
           id: appt.id,
           doctor: appt.doctor_name || 'Doctor',
-          specialty: appt.specialty || appt.doctor_specialty || 'General Practice', // Match the format
-          date: new Date(appt.date).toISOString().split('T')[0],
+          specialty: appt.specialty || appt.doctor_specialty || 'General Practice',
+          date: appt.date.split('T')[0], // Just take the date part without conversion
           time: appt.time.substring(0, 5),
           status: appt.status
         }));
 
+        setAppointments(formattedAppointments);
+        
         // Filter only confirmed appointments for the counter
         const confirmedAppointments = formattedAppointments.filter(
           (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
         );
-        
-        setAppointments(formattedAppointments);
         
         // Update stats with only confirmed appointments
         setStats({

@@ -142,6 +142,11 @@ const DoctorSchedule: React.FC = () => {
       maxPatients: slotData.max_patients
     };
   };
+
+  const formatTime = (time: string): string => {
+    const [hours, minutes] = time.split(':');
+    return `${hours}:${minutes}`;
+  };
   
   return (
     <div className="space-y-6 p-6">
@@ -209,7 +214,7 @@ const DoctorSchedule: React.FC = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center text-white/90">
                         <Clock className="w-4 h-4 mr-2 text-blue-400" />
-                        <span>{slot.startTime} - {slot.endTime}</span>
+                        <span>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
                       </div>
                       <div className="flex space-x-2">
                         <button 
@@ -229,7 +234,7 @@ const DoctorSchedule: React.FC = () => {
                     
                     {slot.breakStart && slot.breakEnd && (
                       <div className="text-sm text-white/60 mb-1">
-                        Break: {slot.breakStart} - {slot.breakEnd}
+                        Break: {formatTime(slot.breakStart)} - {formatTime(slot.breakEnd)}
                       </div>
                     )}
                     
@@ -274,7 +279,10 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.startTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                // Remove step to avoid potential browser issues
+                step="300"
+                required
+                lang="en"
+                data-hour-cycle="h24"
               />
             </div>
             
@@ -286,7 +294,10 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.endTime || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="300"
+                required
+                lang="en"
+                data-hour-cycle="h24"
               />
             </div>
           </div>
@@ -300,7 +311,9 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakStart || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="300"
+                lang="en"
+                data-hour-cycle="h24"
               />
             </div>
             
@@ -312,7 +325,9 @@ const DoctorSchedule: React.FC = () => {
                 value={selectedSlot?.breakEnd || ''}
                 onChange={handleChange}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                step="300" // 5-minute increments
+                step="300"
+                lang="en"
+                data-hour-cycle="h24"
               />
             </div>
           </div>
@@ -333,7 +348,7 @@ const DoctorSchedule: React.FC = () => {
           </div>
           
           <div className="flex justify-end">
-            <small className="text-white/40">Time format: HH:MM (12-hour)</small>
+            <small className="text-white/40">Time format: HH:mm (24-hour)</small>
           </div>
           
           <div className="pt-4 border-t border-white/10 flex justify-end space-x-2">

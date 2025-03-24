@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const db = require('./database'); // Add this line to use the shared database module
+const { formatDate, formatTime } = require('./utils/dateTime');
 
 // Initialize tables
 const initTables = async () => {
@@ -192,12 +193,14 @@ const getNotificationTitle = (type) => {
 
 // Get notification message based on type and appointment
 const getNotificationMessage = (type, appointment) => {
-  const dateStr = new Date(appointment.date).toLocaleDateString();
+  const dateStr = formatDate(new Date(appointment.date));
+  const timeStr = formatTime(appointment.time);
+  
   switch (type) {
     case 'APPOINTMENT_CREATED':
-      return `Appointment scheduled with Dr. ${appointment.doctor_name} on ${dateStr} at ${appointment.time}`;
+      return `Appointment scheduled with Dr. ${appointment.doctor_name} on ${dateStr} at ${timeStr}`;
     case 'APPOINTMENT_RESCHEDULED':
-      return `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled to ${dateStr} at ${appointment.time}`;
+      return `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled to ${dateStr} at ${timeStr}`;
     case 'APPOINTMENT_CANCELLED':
       return `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} has been cancelled`;
     default:

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from './ui/Card';
+import { normalizeDate, format } from '../utils/dateTime';
 
 interface CalendarEvent {
   id: number;
@@ -35,11 +36,6 @@ const Calendar: React.FC<CalendarProps> = ({
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
-  // Get month name
-  const getMonthName = (date: Date): string => {
-    return date.toLocaleString('default', { month: 'long' });
-  };
-
   // Get days in month
   const getDaysInMonth = (date: Date): number => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -50,88 +46,89 @@ const Calendar: React.FC<CalendarProps> = ({
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  // Helper: Parse a YYYY-MM-DD string and return a Date constructed in local time.
-  const parseDateWithoutTimezone = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+  // Simplified formatCalendarDate function using normalizeDate
+  const formatCalendarDate = (year: number, month: number, day: number): string => {
+    const localDate = new Date(year, month, day);
+    return normalizeDate(localDate);
   };
 
-  // Update the hasEvents function to handle date comparison correctly
-
-  // Update the getDateClass function with a more robust approach
+  // Update the getDateClass function to handle completed appointments
   const getDateClass = (cellDateStr: string): string => {
-    // Add debug logging to see what's happening with the dates
-    console.log('Calendar comparing cell date:', cellDateStr);
-    
-    // Direct string comparison approach - no date objects that could cause timezone issues
+    // Get all events for this day
     const eventsOnThisDay = events.filter(event => {
-      console.log(`Calendar event date for comparison: ${event.date}, cell: ${cellDateStr}`);
-      // Use exact string comparison without any date manipulation
-      const isMatch = event.date === cellDateStr && event.status === 'confirmed';
-      if (isMatch) console.log('MATCH FOUND!');
-      return isMatch;
+      const eventDate = event.date.split('T')[0];
+      return eventDate === cellDateStr;
     });
     
-    // Check if today
+    // Check for different event types
+    const hasConfirmed = eventsOnThisDay.some(event => event.status.toLowerCase() === 'confirmed');
+    const hasCompleted = eventsOnThisDay.some(event => event.status.toLowerCase() === 'completed');
+    
+    // Get today's date
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = normalizeDate(today);
     const isToday = todayStr === cellDateStr;
     
-    // First check if it's both today and has an event
-    if (isToday && eventsOnThisDay.length > 0) {
-      return 'bg-purple-500/20 border-purple-500 font-bold'; // Special case: today with appointment
+    // Apply classes based on priority (completed takes precedence over confirmed)
+    if (isToday && hasCompleted) {
+      return 'bg-green-500/20 border-green-500 font-bold';
     }
     
-    // Then check if it just has events
-    if (eventsOnThisDay.length > 0) {
-      return 'bg-blue-500/20 border-blue-500'; // Appointment date
+    if (hasCompleted) {
+      return 'bg-green-500/20 border-green-500';
     }
     
-    // Then if it's just today
+    if (isToday && hasConfirmed) {
+      return 'bg-purple-500/20 border-purple-500 font-bold';
+    }
+    
+    if (hasConfirmed) {
+      return 'bg-blue-500/20 border-blue-500';
+    }
+    
     if (isToday) {
-      return 'relative ring-2 ring-white/50 font-bold'; // Today's date with ring and bold text
+      return 'relative ring-2 ring-white/50 font-bold';
     }
     
-    return ''; // No special styling for regular dates
+    return '';
   };
 
-  // Check if date is today
-
-  // Generate calendar days
+  // Update renderCalendarDays to use the new formatting
   const renderCalendarDays = (): React.ReactElement[] => {
     const days = [];
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDayOfMonth = getFirstDayOfMonth(currentDate);
 
-    // Add borders to the empty cells
     for (let i = 0; i < firstDayOfMonth; i++) {
       days.push(
         <div key={`empty-${i}`} className="h-12 p-1 border border-white/10 rounded" />
       );
     }
 
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based
-    const cells = [];
-
-    // Add borders to the day cells
     for (let day = 1; day <= daysInMonth; day++) {
-      // Construct a string in YYYY-MM-DD format
-      const cellDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const cellDateStr = formatCalendarDate(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        day
+      );
       
-      // Include border-white/10 as a default border that will be overridden by getDateClass if needed
-      cells.push(
+      days.push(
         <div
           key={`day-${day}`}
           className={`h-12 p-1 rounded cursor-pointer flex items-center justify-center border border-white/10 ${getDateClass(cellDateStr)}`}
-          onClick={() => onDateClick && onDateClick(parseDateWithoutTimezone(cellDateStr))}
+          onClick={() => onDateClick && onDateClick(new Date(cellDateStr))}
         >
           {day}
         </div>
       );
     }
 
-    return cells;
+    return days;
+  };
+
+  // Update the month/year display format
+  const getDisplayDate = () => {
+    return format(currentDate, 'MMMM yyyy');
   };
 
   return (
@@ -146,7 +143,7 @@ const Calendar: React.FC<CalendarProps> = ({
             <ChevronLeft className="w-5 h-5" />
           </button>
           <span className="text-sm font-medium text-white/80">
-            {getMonthName(currentDate)} {currentDate.getFullYear()}
+            {getDisplayDate()}
           </span>
           <button 
             className="p-1 text-white/60 hover:text-white/90 transition-colors"

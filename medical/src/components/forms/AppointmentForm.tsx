@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, FileText, MapPin } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { doctorService } from '../../services/api';
+import { formatTime, format, DATE_FORMATS,createLocalDate } from '../../utils/dateTime';
 
 export interface AppointmentFormData {
   doctorId: number;
@@ -25,6 +26,13 @@ interface Doctor {
   specialty: string;
 }
 
+// Add this interface for doctor schedule
+interface DoctorSchedule {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
 interface TimeSlot {
   time: string;
   available: boolean;
@@ -41,11 +49,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
   });
   
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof AppointmentFormData, string>>>({});
   const [availabilityMessage, setAvailabilityMessage] = useState<string>('');
+  
+  // Add state for doctor schedule
+  const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([]);
   
   // Fetch doctors on component mount
   useEffect(() => {
@@ -64,27 +74,19 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     fetchDoctors();
   }, []);
   
-  // Generate available dates when doctor is selected
+  // Update useEffect to fetch doctor schedule when doctor is selected
   useEffect(() => {
     if (formData.doctorId) {
-      const generateDates = () => {
-        const dates: string[] = [];
-        const currentDate = new Date();
-        
-        // Generate dates for the next 2 weeks
-        for (let i = 1; i <= 14; i++) {
-          const nextDate = new Date(currentDate);
-          nextDate.setDate(currentDate.getDate() + i);
-          
-          // Format as YYYY-MM-DD
-          const formattedDate = nextDate.toISOString().split('T')[0];
-          dates.push(formattedDate);
+      const fetchDoctorSchedule = async () => {
+        try {
+          const schedule = await doctorService.getSchedule(formData.doctorId);
+          setDoctorSchedule(schedule);
+        } catch (error) {
+          console.error('Error fetching doctor schedule:', error);
         }
-        
-        setAvailableDates(dates);
       };
-      
-      generateDates();
+
+      fetchDoctorSchedule();
     }
   }, [formData.doctorId]);
   
@@ -169,22 +171,59 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Log the date for debugging
-    console.log('Form date before submission:', formData.date);
-    
-    // Create a copy of the form data to prevent timezone issues
-    const submitData = {
-      ...formData,
-      // Ensure the date is kept exactly as selected without timezone conversion
-      date: formData.date
-    };
-    
-    if (validateForm()) {
-      onSubmit(submitData);
+    if (!validateForm()) {
+      return;
     }
+    
+    const appointmentData = {
+      ...formData,
+      date: formData.date,
+      time: formData.time ? formatTime(formData.time) : '' // Add null check and use formatTime
+    };
+
+    onSubmit(appointmentData);
+  };
+
+  // Add helper function to format date with day
+  const formatDateWithDay = (dateStr: string) => {
+    // Use our utility to create timezone-safe dates
+    const date = createLocalDate(dateStr);
+    return format(date, 'EEEE, ' + DATE_FORMATS.DISPLAY.DATE);
+  };
+
+  // Update the generateAvailableDates function
+  const generateAvailableDates = (): string[] => {
+    if (!doctorSchedule || doctorSchedule.length === 0) return [];
+    
+    const dates: string[] = [];
+    
+    // Get today's date without time component
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Get the schedule days
+    const scheduledDays = doctorSchedule.map(s => s.day_of_week);
+    
+    // Look ahead 30 days
+    for (let i = 1; i <= 30; i++) {
+      const currentDate = new Date(today);
+      currentDate.setDate(today.getDate() + i);
+      
+      // Get day of week (0-6, Sunday-Saturday)
+      const dayOfWeek = currentDate.getDay();
+      
+      // Check if doctor works on this day
+      if (scheduledDays.includes(dayOfWeek)) {
+        // Use our date utility for consistent formatting
+        const dateStr = format(currentDate, DATE_FORMATS.DATABASE);
+        dates.push(dateStr);
+      }
+    }
+    
+    return dates;
   };
   
   return (
@@ -233,19 +272,19 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
                 transition-colors text-white ${!formData.doctorId ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value="">Select a date</option>
-              {availableDates.map(date => (
+              {generateAvailableDates().map(date => (
                 <option key={date} value={date}>
-                  {new Date(date).toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
+                  {formatDateWithDay(date)}
                 </option>
               ))}
             </select>
           </div>
           {errors.date && <p className="text-red-400 text-sm mt-1">{errors.date}</p>}
+          {!formData.doctorId && (
+            <p className="text-sm text-white/60 mt-1">
+              Please select a doctor first to see available dates
+            </p>
+          )}
         </div>
         
         {/* Time Selection */}
@@ -271,7 +310,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
                   value={slot.time}
                   disabled={!slot.available}
                 >
-                  {slot.time}
+                  {formatTime(slot.time)} {/* Use formatTime here */}
                 </option>
               ))}
             </select>

@@ -17,6 +17,7 @@ import Calendar from '../../components/Calendar';
 import AppointmentForm, { AppointmentFormData } from '../../components/forms/AppointmentForm';
 import { appointmentService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { formatDate, formatTime, formatFullDate, createLocalDate } from '../../utils/dateTime';
 
 interface Appointment {
   id: number;
@@ -42,12 +43,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onViewDetails, 
   onCancelAppointment 
 }) => {
-  // Don't use Date constructor - use the date string directly to prevent timezone shifts
-  // Adjust the formatting without using Date constructor
-  const formattedDate = appointment.date.split('-').reverse().join('/');
-
+  // Use createLocalDate to ensure consistent date display
   return (
     <Card>
+      {/* Card header remains the same */}
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-medium text-lg text-white/90">{appointment.doctor}</h3>
@@ -59,9 +58,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <div className="space-y-3">
         <div className="flex items-center text-white/60">
           <CalendarIcon className="w-4 h-4 mr-2" />
-          {formattedDate}
+          {formatDate(appointment.date)} {/* Use formatDate to display correct date */}
           <Clock className="w-4 h-4 ml-4 mr-2" />
-          {appointment.time}
+          {formatTime(appointment.time)}
         </div>
         <div className="flex items-center text-white/60">
           <MapPin className="w-4 h-4 mr-2" />
@@ -121,17 +120,6 @@ interface AppointmentDetailsProps {
 }
 
 const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointment, onClose }) => {
-  // Format the date properly
-  const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long', 
-    day: 'numeric'
-  });
-  
-  // Format the time properly (remove seconds)
-  const formattedTime = appointment.time.substring(0, 5);
-  
   return (
     <div className="space-y-6">
       <div>
@@ -149,11 +137,14 @@ const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointment, on
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-white/60 mb-1">Date</label>
-              <p className="text-white">{formattedDate}</p>
+              <p className="text-white">
+                {/* Use createLocalDate to ensure correct date display */}
+                {formatFullDate(appointment.date)}
+              </p>
             </div>
             <div>
               <label className="block text-sm text-white/60 mb-1">Time</label>
-              <p className="text-white">{formattedTime}</p>
+              <p className="text-white">{formatTime(appointment.time)}</p>
             </div>
             <div>
               <label className="block text-sm text-white/60 mb-1">Location</label>
@@ -251,18 +242,23 @@ const PatientAppointments: React.FC = () => {
         endDate: formattedEndDate
       });
       
-      // Update this transformation to properly handle specialty
-      const transformedData = data.map((item: any) => ({
-        id: item.id,
-        doctor: item.doctor_name,
-        specialty: item.specialty || item.doctor_specialty || "General Practice", // Try both fields
-        date: item.date,
-        time: item.time.substring(0, 5),
-        location: item.location || "Main Clinic",
-        status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
-        type: item.type || "Consultation",
-        notes: item.notes
-      }));
+      // Make sure this transformation is using clean date strings
+      const transformedData = data.map((item: any) => {
+        // Ensure we get a clean date string without timezone info
+        const appointmentDate = item.date.split('T')[0];
+        
+        return {
+          id: item.id,
+          doctor: item.doctor_name,
+          specialty: item.specialty || item.doctor_specialty || "General Practice",
+          date: appointmentDate, // Use the clean date string
+          time: item.time.substring(0, 5),
+          location: item.location || "Main Clinic",
+          status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
+          type: item.type || "Consultation",
+          notes: item.notes
+        };
+      });
       
       setAppointments(transformedData);
     } catch (err: any) {
@@ -275,22 +271,23 @@ const PatientAppointments: React.FC = () => {
 
   // Convert appointments to calendar events - with extra debug
   const calendarEvents = appointments
-    .filter(appointment => appointment.status.toLowerCase() === 'confirmed')
-    .map(appointment => {
-      // Keep the date exactly as is from backend
-      console.log('Creating calendar event with date:', appointment.date, 'from appointment:', appointment);
-      return {
-        id: appointment.id,
-        date: appointment.date, // No manipulation at all
-        title: `${appointment.time} - ${appointment.doctor}`,
-        type: appointment.type,
-        status: 'confirmed'
-      };
-    });
+    .filter(appointment => 
+      appointment.status.toLowerCase() === 'confirmed' || 
+      appointment.status.toLowerCase() === 'completed'
+    )
+    .map(appointment => ({
+      id: appointment.id,
+      date: appointment.date.split('T')[0],
+      title: `${appointment.time} - ${appointment.doctor}`,
+      type: appointment.type,
+      status: appointment.status.toLowerCase()
+    }));
 
   const filteredAppointments = appointments.filter(appointment => {
-    const appointmentDateTime = new Date(`${appointment.date} ${appointment.time}`);
-    const isUpcoming = appointmentDateTime > new Date();
+    // Use createLocalDate for proper date comparison
+    const appointmentDate = createLocalDate(appointment.date);
+    const now = new Date();
+    const isUpcoming = appointmentDate > now;
     const statusLower = appointment.status.toLowerCase();
 
     // Filter by status
@@ -360,29 +357,20 @@ const PatientAppointments: React.FC = () => {
     try {
       setError('');
       
-      console.log('Selected date:', data.date);
-      
-      // Keep the date exactly as selected
       const appointmentData = {
         patientId: user!.id,
         doctorId: data.doctorId,
-        date: data.date, // Keep as-is without manipulation
+        date: data.date,
         time: data.time,
-        duration: 30, // Default duration in minutes
+        duration: 30,
         type: data.type,
         notes: data.reason
       };
       
-      console.log('Appointment data before API call:', appointmentData);
-      
       await appointmentService.createAppointment(appointmentData);
-      
       setIsNewAppointmentOpen(false);
-      
-      // Refresh appointments
       fetchAppointments();
     } catch (err) {
-      console.error('Error scheduling appointment:', err);
       setError('Failed to schedule appointment. Please try again.');
     }
   };

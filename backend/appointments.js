@@ -3,6 +3,7 @@ const router = express.Router();
 const moment = require('moment');
 const { sendAppointmentNotification } = require('./notifications');
 const db = require('./database'); // This is the shared database configuration!
+const { normalizeDate, normalizeTime } = require('./utils/dateTime');
 
 // Initialize tables
 const initTables = async () => {
@@ -117,11 +118,11 @@ router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
     
-    // Use the date exactly as provided without any conversion
-    const formattedDate = date;
+    const normalizedDate = normalizeDate(date);
+    const normalizedTime = normalizeTime(time);
 
-    // Check availability
-    const isAvailable = await checkAvailability(doctorId, formattedDate, time);
+    // Check availability first
+    const isAvailable = await checkAvailability(doctorId, normalizedDate, normalizedTime);
     if (!isAvailable) {
       return res.status(400).json({ error: 'Time slot not available' });
     }
@@ -130,20 +131,11 @@ router.post('/', async (req, res) => {
       `INSERT INTO appointments 
        (patient_id, doctor_id, date, time, duration, type, notes, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
-       RETURNING id`,
-      [patientId, doctorId, formattedDate, time, duration, type, notes]
+       RETURNING *`,
+      [patientId, doctorId, normalizedDate, normalizedTime, duration, type, notes]
     );
 
-    // Send notification (implement your notification system here)
-    sendAppointmentNotification({
-      type: 'APPOINTMENT_CREATED',
-      appointmentId: result.rows[0].id
-    });
-
-    res.status(201).json({
-      message: 'Appointment created successfully',
-      appointmentId: result.rows[0].id
-    });
+    res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating appointment:', error);
     res.status(500).json({ error: 'Internal server error' });
