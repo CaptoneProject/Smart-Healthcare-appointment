@@ -224,14 +224,14 @@ const DoctorDashboard: React.FC = () => {
       title: "Today's Appointments",
       value: loading ? "..." : stats.todayCount,
       footer: "View schedule",
-      link: "/d/schedule"
+      link: "/d/appointments?filter=today" // Changed from /d/schedule to /d/appointments with today filter
     },
     {
       icon: Clock,
-      title: "Pending Appointments",
+      title: "Pending Approvals", // Changed from "Pending Appointments"
       value: loading ? "..." : stats.pendingCount,
       footer: "View all",
-      link: "/d/appointments"
+      link: "/d/appointments?filter=pending_approval" // Updated link with filter query param
     },
     {
       icon: UserPlus,

@@ -175,7 +175,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 const DoctorAppointments: React.FC = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past' | 'today' | 'pending_approval'>('today');
+  const filterParam = searchParams.get('filter');
+  
+  // Set initial filter based on URL parameter
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'past' | 'today' | 'pending_approval'>(
+    filterParam === 'pending_approval' ? 'pending_approval' : 'today'
+  );
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
