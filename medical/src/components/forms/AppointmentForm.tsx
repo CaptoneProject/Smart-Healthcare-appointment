@@ -207,9 +207,9 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     // Get the schedule days
     const scheduledDays = doctorSchedule.map(s => s.day_of_week);
     
-    // Look ahead 30 days
-    for (let i = 1; i <= 30; i++) {
-      const currentDate = new Date(today);
+    // Look ahead 30 days, INCLUDING today
+    for (let i = 0; i <= 30; i++) {
+      const currentDate = new Date();
       currentDate.setDate(today.getDate() + i);
       
       // Get day of week (0-6, Sunday-Saturday)
@@ -219,6 +219,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
       if (scheduledDays.includes(dayOfWeek)) {
         // Use our date utility for consistent formatting
         const dateStr = format(currentDate, DATE_FORMATS.DATABASE);
+        // Always add the date if doctor works on this day
         dates.push(dateStr);
       }
     }

@@ -124,6 +124,8 @@ export const NotificationBell: React.FC = () => {
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
               <div className="p-4 text-center text-white/60">Loading...</div>
+            ) : error ? (
+              <div className="p-4 text-center text-red-400">{error}</div>
             ) : notifications.length === 0 ? (
               <div className="p-4 text-center text-white/60">No notifications</div>
             ) : (
