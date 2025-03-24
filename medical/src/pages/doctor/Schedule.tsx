@@ -169,11 +169,11 @@ const DoctorSchedule: React.FC = () => {
     };
   };
   
-  // Function to validate time input is in correct format
-  const validateTimeFormat = (timeString: string): boolean => {
-    const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-    return timePattern.test(timeString);
-  };
+  // // Function to validate time input is in correct format
+  // const validateTimeFormat = (timeString: string): boolean => {
+  //   const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+  //   return timePattern.test(timeString);
+  // };
   
   return (
     <div className="space-y-6 p-6">

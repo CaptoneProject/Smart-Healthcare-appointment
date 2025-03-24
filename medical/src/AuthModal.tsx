@@ -33,7 +33,7 @@ const initialFormData: FormData = {
 };
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'signin' }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const { login, register, loading, error: authError } = useAuth();
   const [isSignIn, setIsSignIn] = useState<boolean>(initialMode === 'signin');
   const [showPassword, setShowPassword] = useState<boolean>(false);
