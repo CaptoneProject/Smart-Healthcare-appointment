@@ -1,33 +1,81 @@
 import React, { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
-import { adminService } from '../../services/api';
-import { Search, Filter, Download, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { adminService, appointmentService } from '../../services/api'; // Add appointmentService
+import { Search, Filter, Download, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal'; // Add Modal
+import AppointmentForm, { AppointmentFormData } from '../../components/forms/AppointmentForm'; // Add these
 
 const AppointmentsManagement: React.FC = () => {
-  const [appointments, setAppointments] = useState([]);
+  // Add new states
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState<boolean>(false);
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState<any>(null);
+  
+  // Existing states
+  const [appointments, setAppointments] = useState<any[]>([]); // Specify the type as any[]
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('today');
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        setLoading(true);
-        // You may need to create this endpoint in your backend
-        const data = await adminService.getAllAppointments(dateFilter);
-        setAppointments(data);
-      } catch (err) {
-        console.error('Error fetching appointments:', err);
-        setError('Failed to load appointments');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Add this function to handle rescheduling
+  const handleReschedule = (appointment: any) => {
+    setAppointmentToReschedule(appointment);
+    setIsRescheduleModalOpen(true);
+  };
 
+  // Add this function to handle form submission
+  const handleRescheduleSubmit = async (data: AppointmentFormData) => {
+    if (!appointmentToReschedule) return;
+
+    try {
+      await appointmentService.rescheduleAppointment(appointmentToReschedule.id, {
+        date: data.date,
+        time: data.time,
+        rescheduledBy: 'admin', // Set 'admin' as the rescheduler
+        oldDate: appointmentToReschedule.date,
+        oldTime: appointmentToReschedule.time
+      });
+
+      // Update local state
+      setAppointments((prev: any[]) => prev.map(apt => 
+        apt.id === appointmentToReschedule.id
+          ? { 
+              ...apt,
+              date: data.date,
+              time: data.time,
+              status: 'confirmed'
+            }
+          : apt
+      ));
+
+      setIsRescheduleModalOpen(false);
+      
+      // Refresh appointments list
+      fetchAppointments();
+      
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to reschedule appointment');
+    }
+  };
+
+  // Move the fetchAppointments function outside of useEffect
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getAllAppointments(dateFilter);
+      setAppointments(data);
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+      setError('Failed to load appointments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAppointments();
   }, [dateFilter]);
 
@@ -158,6 +206,18 @@ const AppointmentsManagement: React.FC = () => {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center space-x-2">
+                          {/* Add reschedule button */}
+                          {(appt.status === 'confirmed' || appt.status === 'scheduled') && (
+                            <button 
+                              className="text-white/60 hover:text-blue-400 px-2 py-1 rounded hover:bg-blue-500/10" 
+                              title="Reschedule"
+                              onClick={() => handleReschedule(appt)}
+                            >
+                              <Clock className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          {/* Existing buttons */}
                           <button className="text-white/60 hover:text-green-400 px-2 py-1 rounded hover:bg-green-500/10" title="Confirm">
                             <CheckCircle className="w-4 h-4" />
                           </button>
@@ -191,6 +251,26 @@ const AppointmentsManagement: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* Add Reschedule Modal */}
+      <Modal
+        isOpen={isRescheduleModalOpen}
+        onClose={() => setIsRescheduleModalOpen(false)}
+        title="Reschedule Appointment"
+      >
+        {appointmentToReschedule && (
+          <AppointmentForm
+            onSubmit={handleRescheduleSubmit}
+            onCancel={() => setIsRescheduleModalOpen(false)}
+            initialData={{
+              doctorId: appointmentToReschedule.doctor_id,
+              type: appointmentToReschedule.type || 'Consultation',
+              location: appointmentToReschedule.location || 'Main Clinic'
+            }}
+            hideReasonField={true} // Add this prop
+          />
+        )}
+      </Modal>
     </div>
   );
 };

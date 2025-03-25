@@ -18,6 +18,7 @@ interface AppointmentFormProps {
   onSubmit: (data: AppointmentFormData) => void;
   onCancel: () => void;
   initialData?: Partial<AppointmentFormData>;
+  hideReasonField?: boolean; // Add this prop
 }
 
 interface Doctor {
@@ -38,7 +39,7 @@ interface TimeSlot {
   available: boolean;
 }
 
-const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, initialData = {} }) => {
+const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, initialData = {}, hideReasonField = false }) => {
   const [formData, setFormData] = useState<AppointmentFormData>({
     doctorId: initialData.doctorId || 0,
     date: initialData.date || '',
@@ -372,19 +373,21 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
         </div>
         
         {/* Reason / Notes */}
-        <div>
-          <label className="block text-sm font-medium text-white/60 mb-2">
-            Reason for Visit
-          </label>
-          <textarea
-            name="reason"
-            value={formData.reason}
-            onChange={handleChange}
-            rows={4}
-            className="w-full bg-white/10 border border-white/20 rounded-lg p-4 focus:outline-none focus:border-blue-500 transition-colors text-white"
-            placeholder="Please describe your symptoms or reason for the appointment..."
-          />
-        </div>
+        {!hideReasonField && (
+          <div>
+            <label className="block text-sm font-medium text-white/60 mb-2">
+              Reason for Visit
+            </label>
+            <textarea
+              name="reason"
+              value={formData.reason}
+              onChange={handleChange}
+              rows={4}
+              className="w-full bg-white/10 border border-white/20 rounded-lg p-4 focus:outline-none focus:border-blue-500 transition-colors text-white"
+              placeholder="Please describe your symptoms or reason for the appointment..."
+            />
+          </div>
+        )}
       </div>
       
       <div className="pt-4 border-t border-white/10 flex justify-end space-x-2">

@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
 import { useSearchParams } from 'react-router-dom';
 import { formatDate, formatTime, formatFullDate, createLocalDate } from '../../utils/dateTime';
+import AppointmentForm, { AppointmentFormData } from '../../components/forms/AppointmentForm';
 
 interface Appointment {
   id: number;
@@ -33,6 +34,7 @@ interface AppointmentCardProps {
   appointment: Appointment;
   onViewDetails: (appointment: Appointment) => void;
   onUpdateStatus: (id: number, status: string) => void;
+  onReschedule: (appointment: Appointment) => void; // Add this
 }
 
 const AppointmentDetailsModal: React.FC<{
@@ -100,7 +102,8 @@ const AppointmentDetailsModal: React.FC<{
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
   appointment, 
   onViewDetails,
-  onUpdateStatus
+  onUpdateStatus,
+  onReschedule // Add this prop
 }) => {
   return (
     <Card>
@@ -137,36 +140,51 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         >
           View Details
         </Button>
-        {appointment.status.toLowerCase() === 'scheduled' && (
-          <div className="flex space-x-2">
+        
+        <div className="flex space-x-2">
+          {/* Add reschedule button for confirmed appointments */}
+          {appointment.status.toLowerCase() === 'confirmed' && (
+            <Button 
+              variant="secondary" 
+              size="sm"
+              onClick={() => onReschedule(appointment)}
+            >
+              Reschedule
+            </Button>
+          )}
+          
+          {/* Existing conditional buttons */}
+          {appointment.status.toLowerCase() === 'scheduled' && (
+            <>
+              <Button 
+                variant="primary" 
+                size="sm"
+                onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Confirm
+              </Button>
+              <Button 
+                variant="danger" 
+                size="sm"
+                onClick={() => onUpdateStatus(appointment.id, 'rejected')}
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                Reject
+              </Button>
+            </>
+          )}
+          {appointment.status.toLowerCase() === 'confirmed' && (
             <Button 
               variant="primary" 
               size="sm"
-              onClick={() => onUpdateStatus(appointment.id, 'confirmed')}
+              onClick={() => onUpdateStatus(appointment.id, 'completed')}
             >
               <CheckCircle className="w-4 h-4 mr-1" />
-              Confirm
+              Complete
             </Button>
-            <Button 
-              variant="danger" 
-              size="sm"
-              onClick={() => onUpdateStatus(appointment.id, 'rejected')}
-            >
-              <XCircle className="w-4 h-4 mr-1" />
-              Reject
-            </Button>
-          </div>
-        )}
-        {appointment.status.toLowerCase() === 'confirmed' && (
-          <Button 
-            variant="primary" 
-            size="sm"
-            onClick={() => onUpdateStatus(appointment.id, 'completed')}
-          >
-            <CheckCircle className="w-4 h-4 mr-1" />
-            Complete
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </Card>
   );
@@ -188,6 +206,10 @@ const DoctorAppointments: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Add these new states
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState<boolean>(false);
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState<Appointment | null>(null);
+  
   const fetchAppointments = async () => {
     if (!user?.id) return;
     
@@ -343,6 +365,46 @@ const DoctorAppointments: React.FC = () => {
     }
   };
 
+  // Add this function to handle reschedule button clicks
+  const handleReschedule = (appointment: Appointment) => {
+    setAppointmentToReschedule(appointment);
+    setIsRescheduleModalOpen(true);
+  };
+
+  // Add this function to handle reschedule form submissions
+  const handleRescheduleSubmit = async (data: AppointmentFormData) => {
+    if (!appointmentToReschedule || !user) return;
+
+    try {
+      setError('');
+      await appointmentService.rescheduleAppointment(appointmentToReschedule.id, {
+        date: data.date,
+        time: data.time,
+        rescheduledBy: 'doctor', // Set 'doctor' as the rescheduler
+        oldDate: appointmentToReschedule.date,
+        oldTime: appointmentToReschedule.time
+      });
+
+      // Update local state
+      setAppointments(prev => prev.map(apt => 
+        apt.id === appointmentToReschedule.id
+          ? { 
+              ...apt,
+              date: data.date,
+              time: data.time,
+              status: 'confirmed'
+            }
+          : apt
+      ));
+
+      setIsRescheduleModalOpen(false);
+      await fetchAppointments(); // Refresh appointments list
+      
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to reschedule appointment');
+    }
+  };
+  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -384,6 +446,7 @@ const DoctorAppointments: React.FC = () => {
                   appointment={appointment} 
                   onViewDetails={handleViewDetails}
                   onUpdateStatus={handleUpdateStatus}
+                  onReschedule={handleReschedule} // Add this prop
                 />
               ))
             ) : (
@@ -407,6 +470,26 @@ const DoctorAppointments: React.FC = () => {
         onClose={() => setIsDetailsModalOpen(false)}
         appointment={selectedAppointment}
       />
+
+      {/* Add Reschedule Modal */}
+      <Modal
+        isOpen={isRescheduleModalOpen}
+        onClose={() => setIsRescheduleModalOpen(false)}
+        title="Reschedule Appointment"
+      >
+        {appointmentToReschedule && (
+          <AppointmentForm
+            onSubmit={handleRescheduleSubmit}
+            onCancel={() => setIsRescheduleModalOpen(false)}
+            initialData={{
+              doctorId: user?.id || 0,
+              type: appointmentToReschedule.type,
+              location: appointmentToReschedule.location
+            }}
+            hideReasonField={true} // Add this prop
+          />
+        )}
+      </Modal>
     </div>
   );
 };
