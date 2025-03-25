@@ -31,6 +31,7 @@ interface Appointment {
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'rejected' | 'pending';
   type: string;
   notes?: string;
+  reschedule_count?: number; // Add this property
 }
 
 interface AppointmentCardProps {
@@ -84,9 +85,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </Button>
         
         <div className="flex gap-2">
-          {/* Reschedule button - show for scheduled/confirmed appointments */}
+          {/* Reschedule button - show for scheduled/confirmed appointments that haven't been rescheduled yet */}
           {(appointment.status.toLowerCase() === 'confirmed' || 
-            appointment.status.toLowerCase() === 'scheduled') && (
+            appointment.status.toLowerCase() === 'scheduled') && 
+            (appointment.reschedule_count === 0 || appointment.reschedule_count === undefined) && (
             <Button
               variant="secondary"
               size="sm"
@@ -277,7 +279,8 @@ const PatientAppointments: React.FC = () => {
           location: item.location || "Main Clinic",
           status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'Scheduled',
           type: item.type || "Consultation",
-          notes: item.notes
+          notes: item.notes,
+          reschedule_count: item.reschedule_count // Add this line
         };
       });
       
