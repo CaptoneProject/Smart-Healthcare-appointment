@@ -18,7 +18,7 @@ const AppointmentsManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('all'); // Changed from 'today' to 'all'
 
   // Add this function to handle rescheduling
   const handleReschedule = (appointment: any) => {
@@ -78,6 +78,14 @@ const AppointmentsManagement: React.FC = () => {
   useEffect(() => {
     fetchAppointments();
   }, [dateFilter]);
+
+  // Also, let's add an additional useEffect to reset to 'all' when the component mounts
+  useEffect(() => {
+    // Reset to 'all' when component mounts
+    setStatusFilter('all');
+    setDateFilter('all');
+    fetchAppointments();
+  }, []); // Empty dependency array means this runs once on mount
 
   // Filter appointments based on search and status
   const filteredAppointments = appointments.filter((appt: any) => {
