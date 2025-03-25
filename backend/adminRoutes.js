@@ -356,40 +356,92 @@ router.delete('/users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Prevent admins from deleting themselves
-    if (parseInt(id) === req.user.userId) {
-      return res.status(400).json({ error: 'You cannot delete your own account' });
-    }
+    await db.query('BEGIN');
     
-    // Check if user exists
-    const userCheck = await db.query('SELECT id, user_type FROM users WHERE id = $1', [id]);
-    
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Extra safety check for preventing deletion of the last admin
-    if (userCheck.rows[0].user_type === 'admin') {
-      const adminCount = await db.query('SELECT COUNT(*) FROM users WHERE user_type = $1', ['admin']);
-      if (parseInt(adminCount.rows[0].count) <= 1) {
-        return res.status(400).json({ error: 'Cannot delete the last admin user' });
+    try {
+      // 1. Check user exists and validate
+      const userCheck = await db.query(
+        'SELECT id, user_type, name FROM users WHERE id = $1',
+        [id]
+      );
+      
+      if (userCheck.rows.length === 0) {
+        await db.query('ROLLBACK');
+        return res.status(404).json({ error: 'User not found' });
       }
+
+      const user = userCheck.rows[0];
+      
+      // 2. Prevent self-deletion
+      if (parseInt(id) === req.user.userId) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ error: 'You cannot delete your own account' });
+      }
+
+      // 3. Prevent deleting last admin
+      if (user.user_type === 'admin') {
+        const adminCount = await db.query(
+          'SELECT COUNT(*) FROM users WHERE user_type = $1',
+          ['admin']
+        );
+        if (parseInt(adminCount.rows[0].count) <= 1) {
+          await db.query('ROLLBACK');
+          return res.status(400).json({ error: 'Cannot delete the last admin user' });
+        }
+      }
+
+      // 4. First handle appointments - Important to do this first!
+      await db.query(
+        `UPDATE appointments 
+         SET status = 'cancelled' 
+         WHERE doctor_id = $1 OR patient_id = $1`,
+        [id]
+      );
+
+      // 5. Then delete related records in correct order
+      await db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [id]);
+      await db.query('DELETE FROM notifications WHERE user_id = $1', [id]);
+      
+      if (user.user_type === 'doctor') {
+        await db.query('DELETE FROM doctor_credentials WHERE doctor_id = $1', [id]);
+        await db.query('DELETE FROM doctor_schedules WHERE doctor_id = $1', [id]);
+      }
+      
+      // 6. Delete the user's appointments after they've been cancelled
+      await db.query('DELETE FROM appointments WHERE doctor_id = $1 OR patient_id = $1', [id]);
+      
+      // 7. Finally delete the user
+      await db.query('DELETE FROM users WHERE id = $1', [id]);
+
+      // 8. Log the activity
+      await db.query(
+        `INSERT INTO system_activities (type, message, related_id) 
+         VALUES ($1, $2, $3)`,
+        ['USER_DELETED', `User ${user.name} (${user.user_type}) was deleted`, req.user.userId]
+      );
+
+      await db.query('COMMIT');
+      
+      res.json({ 
+        message: 'User deleted successfully',
+        deletedUser: {
+          id: user.id,
+          name: user.name,
+          type: user.user_type
+        }
+      });
+      
+    } catch (innerError) {
+      await db.query('ROLLBACK');
+      throw innerError;
     }
     
-    // Delete user - this should cascade to related data if you've set up your foreign keys correctly
-    await db.query('DELETE FROM users WHERE id = $1', [id]);
-    
-    // Log the activity
-    await logSystemActivity(
-      'USER_DELETED',
-      `User account deleted: ID ${id}`,
-      req.user.userId
-    );
-    
-    res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

@@ -61,13 +61,11 @@ const StatCard: React.FC<StatCardProps> = ({
           </div>
           <p className="text-white/60 text-sm mt-1">{description}</p>
           
-          {/* Add a placeholder div when no change is present to maintain consistent height */}
-          {change ? (
+          {/* Simplified change display */}
+          {change && (
             <div className={`mt-2 text-sm ${change.positive ? 'text-green-400' : 'text-red-400'}`}>
-              {change.positive ? '↑' : '↓'} {change.value} from last week
+              {change.value}
             </div>
-          ) : (
-            <div className="mt-2 h-5"></div> 
           )}
         </div>
         
@@ -234,7 +232,7 @@ const AdminDashboard: React.FC = () => {
           value={stats.totalUsers.toLocaleString()} 
           icon={Users}
           description="Active users in the system"
-          change={{ value: "12%", positive: true }}
+          change={{ value: "", positive: true }}
           onClick={handleNavigateToUsers}
           isLoading={loading}
         />
