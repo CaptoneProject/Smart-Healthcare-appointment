@@ -159,7 +159,7 @@ router.get('/system-stats', isAdmin, async (req, res) => {
     
     // Get pending credentials count
     const pendingResult = await db.query(
-      `SELECT COUNT(*) as count FROM doctor_credentials WHERE verification_status = 'confirmed'`
+      `SELECT COUNT(*) as count FROM doctor_credentials WHERE verification_status = 'pending'`
     );
     
     // Format the response

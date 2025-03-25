@@ -133,7 +133,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
         window.location.href = '/admin/dashboard';
         return;
       } else if (userType === 'doctor') {
-        loginResponse = await login('doctor1@gmail.com', 'Doctor@1');
+        loginResponse = await login('doctor1@gmail.com', 'doctor@1');
       } else {
         loginResponse = await login('patient1@gmail.com', 'patient@1');
       }
