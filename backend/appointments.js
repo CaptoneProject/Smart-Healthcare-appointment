@@ -38,6 +38,10 @@ const initTables = async () => {
       ALTER TABLE appointments 
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     `);
+    await db.query(`
+      ALTER TABLE appointments 
+      ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0
+    `);
   } catch (error) {
     console.error('Error adding updated_at column:', error);
   }
@@ -417,6 +421,86 @@ router.put('/:id/cancel', async (req, res) => {
     res.json({ message: 'Appointment cancelled successfully' });
   } catch (error) {
     console.error('Error cancelling appointment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// In appointments.js
+router.put('/:id/reschedule', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, time, rescheduledBy, oldDate, oldTime } = req.body;
+
+    // Get current appointment details
+    const appointmentQuery = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name,
+              reschedule_count, patient_id, doctor_id
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    const appt = appointmentQuery.rows[0];
+
+    // Add patient rescheduling limit check
+    if (rescheduledBy === 'patient' && appt.reschedule_count >= 1) {
+      return res.status(403).json({ 
+        error: 'As a patient, you can only reschedule an appointment once'
+      });
+    }
+
+    // Update appointment
+    await db.query(
+      `UPDATE appointments 
+       SET date = $1, 
+           time = $2, 
+           reschedule_count = reschedule_count + 1,
+           status = 'confirmed',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [date, time, id]
+    );
+
+    // Send notifications with complete data
+    await sendAppointmentNotification({
+      type: 'APPOINTMENT_RESCHEDULED',
+      appointmentId: id,
+      rescheduledBy,
+      oldDate: oldDate, 
+      oldTime: oldTime,
+      newDate: date,
+      newTime: time,
+      patient_name: appt.patient_name,
+      doctor_name: appt.doctor_name,
+      patient_id: appt.patient_id,
+      doctor_id: appt.doctor_id
+    });
+
+    // Create system activity log
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'APPOINTMENT_RESCHEDULED',
+        `Appointment rescheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} from ${oldDate} ${oldTime} to ${date} ${time}`,
+        id
+      ]
+    );
+
+    res.json({ 
+      message: 'Appointment rescheduled successfully',
+      appointment: {
+        ...appt,
+        date,
+        time,
+        status: 'confirmed'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error rescheduling appointment:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

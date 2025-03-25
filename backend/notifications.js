@@ -263,6 +263,11 @@ const getNotificationTitle = (type, isForDoctor = false) => {
         ? 'Appointment Completed' 
         : 'Appointment Completed';
       
+    case 'APPOINTMENT_RESCHEDULED':
+      return isForDoctor 
+        ? 'Appointment Rescheduled' 
+        : 'Appointment Rescheduled';
+      
     default:
       return 'Appointment Update';
   }
@@ -306,6 +311,39 @@ const getNotificationMessage = (type, appointment, isForDoctor = false) => {
         ? `You have marked the appointment with ${appointment.patient_name} on ${dateStr} as completed`
         : `Your appointment with Dr. ${appointment.doctor_name} on ${dateStr} has been completed. Thank you for visiting!`;
       
+    case 'APPOINTMENT_RESCHEDULED': {
+      // Get clean date strings without timezone issues
+      let oldDateStr, newDateStr;
+      
+      if (typeof appointment.oldDate === 'string' && appointment.oldDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // If already in YYYY-MM-DD format, use directly
+        oldDateStr = appointment.oldDate;
+      } else {
+        oldDateStr = formatDate(new Date(appointment.oldDate));
+      }
+      
+      if (typeof appointment.newDate === 'string' && appointment.newDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // If already in YYYY-MM-DD format, use directly
+        newDateStr = appointment.newDate;
+      } else {
+        newDateStr = formatDate(new Date(appointment.newDate));
+      }
+      
+      // Format times
+      const oldTimeStr = appointment.oldTime || '00:00';
+      const newTimeStr = appointment.newTime || '00:00';
+      
+      const rescheduler = appointment.rescheduledBy === 'doctor' ? 
+        `Dr. ${appointment.doctor_name}` : 
+        appointment.rescheduledBy === 'admin' ? 
+          'an administrator' : 
+          'you';
+
+      return isForDoctor ?
+        `Appointment with ${appointment.patient_name} has been rescheduled from ${oldDateStr} at ${oldTimeStr} to ${newDateStr} at ${newTimeStr}` :
+        `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled from ${oldDateStr} at ${oldTimeStr} to ${newDateStr} at ${newTimeStr}`;
+    }
+      
     default:
       return `Appointment status has been updated`;
   }
@@ -342,8 +380,19 @@ module.exports = {
       const appointment = await getAppointmentDetails(data.appointmentId);
       if (!appointment) return;
       
-      // Add cancelled_by to the appointment object
-      appointment.cancelled_by = data.cancelledBy || 'patient';
+      // Add necessary data for specific notification types
+      if (data.type === 'APPOINTMENT_CANCELLED') {
+        appointment.cancelled_by = data.cancelledBy || 'patient';
+      }
+      
+      if (data.type === 'APPOINTMENT_RESCHEDULED') {
+        // Add rescheduling details
+        appointment.oldDate = data.oldDate || appointment.date;
+        appointment.newDate = data.newDate || appointment.date;
+        appointment.oldTime = data.oldTime || appointment.time;
+        appointment.newTime = data.newTime || appointment.time;
+        appointment.rescheduledBy = data.rescheduledBy || 'patient';
+      }
       
       // Create notification for patient
       await createNotification({

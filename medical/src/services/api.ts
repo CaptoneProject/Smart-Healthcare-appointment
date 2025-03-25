@@ -146,12 +146,6 @@ export const appointmentService = {
     return response.data;
   },
   
-  rescheduleAppointment: async (id: any, data: any) => {
-    // Using /api/appointments/:id
-    const response = await api.put(`/appointments/${id}`, data);
-    return response.data;
-  },
-  
   cancelAppointment: async (id: any) => {
     // Using /api/appointments/:id
     const response = await api.delete(`/appointments/${id}`);
@@ -162,6 +156,28 @@ export const appointmentService = {
     // Using /api/appointments/:id/status
     const response = await api.put(`/appointments/${id}/status`, { status });
     return response.data;
+  },
+
+  rescheduleAppointment: async (appointmentId: number, data: {
+    date: string;
+    time: string;
+    rescheduledBy: 'patient' | 'doctor' | 'admin';
+    oldDate?: string;
+    oldTime?: string;
+  }) => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/reschedule`, {
+        date: data.date,
+        time: data.time,
+        rescheduledBy: data.rescheduledBy,
+        oldDate: data.oldDate,
+        oldTime: data.oldTime
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error rescheduling appointment:', error);
+      throw error;
+    }
   }
 };
 

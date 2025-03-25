@@ -22,28 +22,30 @@ import { formatDate, formatTime, formatFullDate, createLocalDate } from '../../u
 interface Appointment {
   id: number;
   doctor: string;
-  doctor_name?: string; // Add this property
+  doctor_id: string | number; // Add this property
+  doctor_name?: string;
   specialty: string;
   date: string;
   time: string;
   location: string;
-  status: 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'rejected' | 'pending';
   type: string;
-  notes?: string; // Also add this property since you're using it
+  notes?: string;
 }
 
 interface AppointmentCardProps {
   appointment: Appointment;
   onViewDetails: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: number) => void;
+  onReschedule: (appointment: Appointment) => void;
 }
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
   appointment, 
   onViewDetails, 
-  onCancelAppointment 
+  onCancelAppointment,
+  onReschedule 
 }) => {
-  // Use createLocalDate to ensure consistent date display
   return (
     <Card>
       {/* Card header remains the same */}
@@ -80,15 +82,31 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         >
           View Details
         </Button>
-        {appointment.status === 'Confirmed' && (
-          <Button 
-            variant="danger" 
-            size="sm"
-            onClick={() => onCancelAppointment(appointment.id)}
-          >
-            Cancel Appointment
-          </Button>
-        )}
+        
+        <div className="flex gap-2">
+          {/* Reschedule button - show for scheduled/confirmed appointments */}
+          {(appointment.status.toLowerCase() === 'confirmed' || 
+            appointment.status.toLowerCase() === 'scheduled') && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onReschedule(appointment)}
+            >
+              Reschedule
+            </Button>
+          )}
+
+          {/* Cancel/Delete button - show for non-completed/cancelled appointments */}
+          {!['completed', 'cancelled'].includes(appointment.status.toLowerCase()) && (
+            <Button 
+              variant="danger" 
+              size="sm"
+              onClick={() => onCancelAppointment(appointment.id)}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );
@@ -211,6 +229,8 @@ const PatientAppointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState<boolean>(false);
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState<Appointment | null>(null);
 
   useEffect(() => {
     // Only fetch if user is logged in
@@ -250,11 +270,12 @@ const PatientAppointments: React.FC = () => {
         return {
           id: item.id,
           doctor: item.doctor_name,
+          doctor_id: item.doctor_id, // Add this line
           specialty: item.specialty || item.doctor_specialty || "General Practice",
-          date: appointmentDate, // Use the clean date string
+          date: appointmentDate,
           time: item.time.substring(0, 5),
           location: item.location || "Main Clinic",
-          status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled',
+          status: (item.status.charAt(0).toUpperCase() + item.status.slice(1)) as 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled' | 'Scheduled',
           type: item.type || "Consultation",
           notes: item.notes
         };
@@ -340,7 +361,7 @@ const PatientAppointments: React.FC = () => {
       // Update the local state to reflect the cancellation
       setAppointments(appointments.map(appointment => 
         appointment.id === appointmentToCancel 
-          ? { ...appointment, status: 'Cancelled' }
+          ? { ...appointment, status: 'cancelled' }
           : appointment
       ));
       
@@ -379,6 +400,43 @@ const PatientAppointments: React.FC = () => {
     const appointment = appointments.find(a => a.id === event.id);
     if (appointment) {
       handleViewDetails(appointment);
+    }
+  };
+
+  const handleReschedule = (appointment: Appointment) => {
+    setAppointmentToReschedule(appointment);
+    setIsRescheduleModalOpen(true);
+  };
+
+  const handleRescheduleSubmit = async (data: AppointmentFormData) => {
+    if (!appointmentToReschedule || !user) return;
+
+    try {
+      setError('');
+      const response = await appointmentService.rescheduleAppointment(appointmentToReschedule.id, {
+        date: data.date,
+        time: data.time,
+        rescheduledBy: 'patient',
+        oldDate: appointmentToReschedule.date,
+        oldTime: appointmentToReschedule.time
+      });
+
+      // Use response data to update state
+      setAppointments(prev => prev.map(apt => 
+        apt.id === appointmentToReschedule.id
+          ? { 
+              ...apt,
+              ...response.data, // Use response data if available
+              status: 'confirmed'
+            }
+          : apt
+      ));
+
+      setIsRescheduleModalOpen(false);
+      await fetchAppointments();
+      
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to reschedule appointment');
     }
   };
 
@@ -442,6 +500,7 @@ const PatientAppointments: React.FC = () => {
                   appointment={appointment} 
                   onViewDetails={handleViewDetails}
                   onCancelAppointment={handleCancelAppointment}
+                  onReschedule={handleReschedule}
                 />
               ))
             ) : (
@@ -510,6 +569,27 @@ const PatientAppointments: React.FC = () => {
             Cancel Appointment
           </Button>
         </div>
+      </Modal>
+
+      {/* Add this near your other modals */}
+      <Modal
+        isOpen={isRescheduleModalOpen}
+        onClose={() => setIsRescheduleModalOpen(false)}
+        title="Reschedule Appointment"
+      >
+        {appointmentToReschedule && (
+          <AppointmentForm
+            onSubmit={handleRescheduleSubmit}
+            onCancel={() => setIsRescheduleModalOpen(false)}
+            initialData={{
+              doctorId: typeof appointmentToReschedule.doctor_id === 'string' 
+                ? parseInt(appointmentToReschedule.doctor_id) 
+                : appointmentToReschedule.doctor_id,
+              type: appointmentToReschedule.type,
+              location: appointmentToReschedule.location
+            }}
+          />
+        )}
       </Modal>
     </div>
   );
