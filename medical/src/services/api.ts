@@ -432,6 +432,56 @@ export const adminService = {
     } catch (error) {
       throw error;
     }
+  },
+
+  getDashboardStats: async () => {
+    const response = await api.get('/admin/system-stats');
+    return response.data;
+  },
+
+  getUsers: async () => {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
+  getRecentActivities: async () => {
+    try {
+      const response = await api.get('/admin/activities');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      throw error;
+    }
+  },
+
+  getAllAppointments: async (dateFilter = 'today') => {
+    const response = await api.get(`/admin/appointments?dateFilter=${dateFilter}`);
+    return response.data;
+  },
+
+  getTodayAppointments: async () => {
+    const response = await api.get('/admin/today-appointments');
+    return response.data;
+  },
+
+  getAllActivities: async () => {
+    try {
+      const response = await api.get('/admin/activities');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all activities:', error);
+      throw error;
+    }
+  },
+
+  deleteUser: async (userId: number) => {
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
   }
 };
 

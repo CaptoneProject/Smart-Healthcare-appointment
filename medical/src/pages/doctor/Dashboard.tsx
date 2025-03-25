@@ -186,20 +186,32 @@ const DoctorDashboard: React.FC = () => {
         }));
         
         // Use the defined type for filter operations
-        setTodayAppointments(processedAppointments.filter((appt: AppointmentData) => 
-          appt.date === today
-        ));
+        setTodayAppointments(processedAppointments.filter((appt: AppointmentData) => {
+          // Clean date comparison without time component
+          const appointmentDate = appt.date.split('T')[0];
+          const today = new Date().toISOString().split('T')[0];
+          
+          return appointmentDate === today && 
+                 appt.status.toLowerCase() === 'confirmed';
+        }));
         
         // Update stats with proper typing
         setStats({
-          todayCount: processedAppointments.filter((appt: AppointmentData) => appt.date === today).length,
-          pendingCount: processedAppointments.filter((appt: AppointmentData) => {
-            // Include both scheduled AND pending appointments, regardless of date
-            const status = appt.status.toLowerCase();
-            return status === 'scheduled' || status === 'pending';
+          todayCount: processedAppointments.filter((appt: AppointmentData) => {
+            const appointmentDate = appt.date.split('T')[0];
+            const today = new Date().toISOString().split('T')[0];
+            
+            return appointmentDate === today && 
+                   appt.status.toLowerCase() === 'confirmed';
           }).length,
-          newPatients: 0, // Would come from patient API
-          pendingReports: 0 // Would come from reports API
+          pendingCount: processedAppointments.filter((appt: AppointmentData) => {
+            const status = appt.status.toLowerCase();
+            return status === 'pending_approval' || 
+                   status === 'pending' || 
+                   status === 'scheduled';
+          }).length,
+          newPatients: 0,
+          pendingReports: 0
         });
       } catch (err) {
         console.error('Error fetching dashboard data:', err);

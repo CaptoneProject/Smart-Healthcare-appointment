@@ -48,6 +48,13 @@ router.post('/register', async (req, res) => {
       [user.id, tokens.refreshToken]
     );
 
+    // Log the activity to system_activities table
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      ['USER_REGISTERED', `New ${userType} registered: ${name}`, user.id]
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
       user: {

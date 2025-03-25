@@ -19,6 +19,9 @@ import AdminDashboard from './pages/admin/Dashboard';
 import DoctorApprovals from './pages/admin/DoctorApprovals';
 import ErrorBoundary from './components/ErrorBoundary';
 import AccountRejected from './pages/doctor/AccountRejected';
+import UserManagement from './pages/admin/UserManagement';
+import AppointmentsManagement from './pages/admin/AppointmentsManagement';
+import ActivityLog from './pages/admin/ActivityLog'; // Import the new ActivityLog component
 
 // Update the ProtectedRoute to handle admin routes with better logging
 const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
@@ -125,17 +128,16 @@ const AppWithAuth = () => {
       } />
       
       {/* Admin Routes */}
-      <Route path="/admin" element={
-        <ProtectedRoute userType="admin">
-          <AdminLayout />
-        </ProtectedRoute>
-      }>
+      <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="doctor-approvals" element={
           <ErrorBoundary>
             <DoctorApprovals />
           </ErrorBoundary>
         } />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="appointments" element={<AppointmentsManagement />} />
+        <Route path="activity-log" element={<ActivityLog />} /> {/* New route */}
         {/* Other admin routes */}
       </Route>
       

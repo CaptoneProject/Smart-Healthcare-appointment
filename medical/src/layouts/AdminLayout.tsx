@@ -7,7 +7,8 @@ import {
   Settings, 
   Bell,
   LogOut,
-  Shield
+  Shield,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,6 +21,7 @@ const AdminLayout = () => {
     { icon: Layout, label: 'Dashboard', path: '/admin/dashboard' },
     { icon: UserCheck, label: 'Doctor Approvals', path: '/admin/doctor-approvals' },
     { icon: Users, label: 'User Management', path: '/admin/users' },
+    { icon: Calendar, label: 'Appointments', path: '/admin/appointments' },
     { icon: Settings, label: 'System Settings', path: '/admin/settings' },
   ];
 

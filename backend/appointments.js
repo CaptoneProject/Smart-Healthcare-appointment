@@ -157,6 +157,35 @@ router.post('/', async (req, res) => {
       ]
     );
 
+    // After creating a new appointment
+    const appointmentDetails = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [result.rows[0].id]
+    );
+
+    const appt = appointmentDetails.rows[0];
+
+    // Format the date properly
+    const formattedDate = appt.date ? new Date(appt.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }) : 'unknown date';
+
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'APPOINTMENT_CREATED', 
+        `New appointment scheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${formattedDate}`, 
+        result.rows[0].id
+      ]
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating appointment:', error);
@@ -189,6 +218,27 @@ router.put('/:id', async (req, res) => {
       appointmentId: id
     });
 
+    const appointmentDetails = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    const appt = appointmentDetails.rows[0];
+
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'APPOINTMENT_RESCHEDULED', 
+        `Appointment rescheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${appt.date}`, 
+        id
+      ]
+    );
+
     res.json({ message: 'Appointment rescheduled successfully' });
   } catch (error) {
     console.error('Error rescheduling appointment:', error);
@@ -214,6 +264,27 @@ router.delete('/:id', async (req, res) => {
       appointmentId: id
     });
 
+    const appointmentDetails = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    const appt = appointmentDetails.rows[0];
+
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'APPOINTMENT_CANCELLED', 
+        `Appointment cancelled: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${appt.date}`, 
+        id
+      ]
+    );
+
     res.json({ message: 'Appointment cancelled successfully' });
   } catch (error) {
     console.error('Error cancelling appointment:', error);
@@ -231,7 +302,23 @@ router.put('/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Simplified query without updated_at for now
+    // First retrieve the appointment details to ensure we have all information
+    const appointmentQuery = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+    
+    if (appointmentQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    
+    const appt = appointmentQuery.rows[0];
+    
+    // Then update the status
     await db.query(
       `UPDATE appointments 
        SET status = $1
@@ -239,12 +326,29 @@ router.put('/:id/status', async (req, res) => {
       [status, id]
     );
 
-    // Send appropriate notification based on status
-    const notificationType = `APPOINTMENT_${status.toUpperCase()}`;
+    // Format the date properly for the activity message
+    const formattedDate = appt.date ? new Date(appt.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }) : 'unknown date';
+    
+    // Send notification with the retrieved details
     await sendAppointmentNotification({
-      type: notificationType,
+      type: `APPOINTMENT_${status.toUpperCase()}`,
       appointmentId: id
     });
+
+    // Create the activity record with the nicely formatted date
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        `APPOINTMENT_${status.toUpperCase()}`, 
+        `Appointment ${status}: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${formattedDate}`, 
+        id
+      ]
+    );
 
     res.json({ message: 'Appointment status updated successfully' });
   } catch (error) {
@@ -288,6 +392,27 @@ router.put('/:id/cancel', async (req, res) => {
       appointmentId: id,
       cancelledBy: req.user.userType // 'patient' or 'doctor'
     });
+
+    const appointmentDetails = await db.query(
+      `SELECT a.*, p.name as patient_name, d.name as doctor_name
+       FROM appointments a
+       JOIN users p ON a.patient_id = p.id
+       JOIN users d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    const appt = appointmentDetails.rows[0];
+
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'APPOINTMENT_CANCELLED', 
+        `Appointment cancelled: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${appt.date}`, 
+        id
+      ]
+    );
 
     res.json({ message: 'Appointment cancelled successfully' });
   } catch (error) {
