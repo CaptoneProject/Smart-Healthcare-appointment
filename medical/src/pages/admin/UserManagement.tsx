@@ -160,7 +160,9 @@ const UserManagement: React.FC = () => {
                   filteredUsers.map((user: User) => (
                     <tr key={user.id} className="border-b border-white/5 hover:bg-white/5">
                       <td className="p-3 text-white/90">{user.id}</td>
-                      <td className="p-3 text-white/90">{user.name}</td>
+                      <td className="p-3 text-white/90">
+                        {user.user_type === 'doctor' ? `Dr. ${user.name}` : user.name}
+                      </td>
                       <td className="p-3 text-white/90">{user.email}</td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded-full text-xs ${

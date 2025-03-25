@@ -484,7 +484,7 @@ router.put('/:id/reschedule', async (req, res) => {
        VALUES ($1, $2, $3)`,
       [
         'APPOINTMENT_RESCHEDULED',
-        `Appointment rescheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} from ${oldDate} ${oldTime} to ${date} ${time}`,
+        `Appointment rescheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} from ${oldDate}, ${oldTime}, to ${date}, ${time}`,
         id
       ]
     );

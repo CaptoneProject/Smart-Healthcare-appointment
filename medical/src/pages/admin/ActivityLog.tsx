@@ -83,6 +83,65 @@ const ActivityLog: React.FC = () => {
     }).format(date);
   };
 
+  // Update the formatActivityMessage function to handle both reschedule and cancel messages
+  const formatActivityMessage = (message: string) => {
+    // Format cancellation messages
+    if (message.includes('Appointment cancelled:') && message.includes('on')) {
+      const parts = message.split(' on ');
+      
+      if (parts.length === 2) {
+        const intro = parts[0]; // "Appointment cancelled: Patient1 with Dr. Doctor1"
+        const dateTimeStr = parts[1]; // Date string like "Fri Apr 18 2025 00:00:00 GMT-0400 (Eastern Daylight Time)"
+        
+        // Format the date to YYYY-MM-DD
+        try {
+          const date = new Date(dateTimeStr);
+          const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+          
+          return `${intro} on ${formattedDate}`;
+        } catch (err) {
+          // If date parsing fails, return with original date format
+          return message;
+        }
+      }
+    }
+    
+    // Format rescheduling messages (existing code)
+    if (message.includes('Appointment rescheduled:') && message.includes('from') && message.includes('to')) {
+      // Make sure we capture all parts properly
+      const mainParts = message.split(' from ');
+      
+      if (mainParts.length >= 2) {
+        const intro = mainParts[0]; // "Appointment rescheduled: Patient1 with Dr. Doctor1"
+        const dateParts = mainParts[1].split(' to ');
+        
+        if (dateParts.length >= 2) {
+          let oldDateTime = dateParts[0]; // " 2025-04-04 09:15 " or " 2025-04-09T04:00:00.000Z 12:00:00"
+          let newDateTime = dateParts[1]; // " 2025-03-26 10:15" or similar format
+          
+          // Format the old date/time with commas
+          if (oldDateTime.includes('T') && oldDateTime.includes('Z')) {
+            oldDateTime = oldDateTime.replace(/(\d{4}-\d{2}-\d{2})T[^,]+, (\d{2}:\d{2}:\d{2})/, '$1, $2');
+          } else {
+            oldDateTime = oldDateTime.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/, '$1, $2');
+          }
+          
+          // Format the new date/time with commas
+          if (newDateTime.includes('T') && newDateTime.includes('Z')) {
+            newDateTime = newDateTime.replace(/(\d{4}-\d{2}-\d{2})T[^,]+, (\d{2}:\d{2}:\d{2})/, '$1, $2');
+          } else {
+            newDateTime = newDateTime.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/, '$1, $2');
+          }
+          
+          return `${intro} From ${oldDateTime} To ${newDateTime}`;
+        }
+      }
+    }
+    
+    // Return original message if not matching any of our formatting patterns
+    return message;
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -156,7 +215,7 @@ const ActivityLog: React.FC = () => {
                   <div className="flex flex-col md:flex-row md:justify-between md:items-start">
                     <div>
                       <h4 className="text-sm font-medium text-white/90">{activity.type.replace(/_/g, ' ')}</h4>
-                      <p className="text-white/80 mt-1">{activity.message}</p>
+                      <p className="text-white/80 mt-1">{formatActivityMessage(activity.message)}</p>
                     </div>
                     <span className="text-xs text-white/60 mt-2 md:mt-0">
                       {formatDate(activity.created_at)}

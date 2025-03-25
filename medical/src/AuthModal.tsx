@@ -127,7 +127,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       if (userType === 'admin') {
         console.log('Logging in as admin...');
         //  validation requirements (8+ chars, number, special char)
-        loginResponse = await login('admin1@gmail.com', 'admin@@1');
+        loginResponse = await login('admin1@gmail.com', 'admin@123');
         console.log('Admin login response:', loginResponse);
         
         window.location.href = '/admin/dashboard';
