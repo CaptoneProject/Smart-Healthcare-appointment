@@ -42,6 +42,10 @@ const initTables = async () => {
       ALTER TABLE appointments 
       ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0
     `);
+    await db.query(`
+      ALTER TABLE appointments 
+      ADD COLUMN IF NOT EXISTS date DATE NOT NULL DEFAULT CURRENT_DATE;
+    `);
   } catch (error) {
     console.error('Error adding updated_at column:', error);
   }
