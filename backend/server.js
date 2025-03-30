@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 // Remove the Pool import
 // const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./database'); // Add the shared database module
@@ -214,12 +214,12 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Current password is required' });
       }
 
-      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      const validPassword = await bcryptjs.compare(currentPassword, user.password);
       if (!validPassword) {
         return res.status(401).json({ error: 'Current password is incorrect' });
       }
 
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await bcryptjs.hash(newPassword, 10);
       await db.query(
         'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
         [hashedPassword, req.user.userId]

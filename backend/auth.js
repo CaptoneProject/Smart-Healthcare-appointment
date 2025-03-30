@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database'); // Use the shared database module
 
@@ -31,7 +31,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcryptjs.hash(password, 10);
 
     // Insert new user
     const result = await db.query( // Changed from pool.query to db.query
@@ -89,7 +89,7 @@ router.post('/login', async (req, res) => {
     const user = userResult.rows[0];
     
     // Verify password
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await bcryptjs.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
