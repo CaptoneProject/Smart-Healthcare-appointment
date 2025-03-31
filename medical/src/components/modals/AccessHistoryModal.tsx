@@ -13,7 +13,6 @@ interface AccessHistoryModalProps {
 export const AccessHistoryModal: React.FC<AccessHistoryModalProps> = ({
   isOpen,
   onClose,
-  recordId,
   accessLogs,
   isLoading = false
 }) => {
