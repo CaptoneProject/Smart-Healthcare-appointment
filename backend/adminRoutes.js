@@ -618,4 +618,93 @@ router.get('/medical-records', isAdmin, async (req, res) => {
   }
 });
 
+// Add this endpoint to fetch access logs for a specific record
+router.get('/medical-records/:id/access-logs', isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(
+      `SELECT 
+        mal.*,
+        u.name as accessed_by_name,
+        u.user_type as accessor_role,
+        mal.access_time as timestamp,
+        mal.is_emergency as isEmergency,
+        mal.accessed_by as accessedBy,
+        u.name as accessorName
+       FROM medical_record_access_logs mal
+       JOIN users u ON mal.accessed_by = u.id
+       WHERE mal.record_id = $1
+       ORDER BY mal.access_time DESC`,
+      [id]
+    );
+    
+    // Transform data to match expected format on frontend
+    const formattedLogs = result.rows.map(log => ({
+      id: log.id,
+      recordId: log.record_id,
+      accessedBy: log.accessed_by_name,
+      accessorName: log.accessed_by_name,
+      accessorRole: log.accessor_role,
+      timestamp: log.timestamp,
+      reason: log.reason,
+      isEmergency: log.isEmergency
+    }));
+    
+    res.json(formattedLogs);
+  } catch (error) {
+    console.error('Error fetching access logs:', error);
+    res.status(500).json({ error: 'Failed to fetch access logs' });
+  }
+});
+
+// Add endpoint to update record access settings
+router.put('/medical-records/:id/access', isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body;
+    
+    if (!['restrict', 'unrestrict'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Use "restrict" or "unrestrict"' });
+    }
+    
+    const sensitivityLevel = action === 'restrict' ? 'restricted' : 'normal';
+    
+    // Update the record's sensitivity level
+    await db.query(
+      `UPDATE medical_records 
+       SET sensitivity_level = $1 
+       WHERE id = $2`,
+      [sensitivityLevel, id]
+    );
+    
+    // Log the activity - FIX: Change user_id to related_id
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'MEDICAL_RECORD_ACCESS_CHANGE',
+        `Medical record ID ${id} access level changed to ${sensitivityLevel}`,
+        req.user.userId // This should be the admin's ID
+      ]
+    );
+    
+    // Log the access change in access logs
+    await db.query(
+      `INSERT INTO medical_record_access_logs 
+       (record_id, accessed_by, reason, is_emergency)
+       VALUES ($1, $2, $3, false)`,
+      [id, req.user.userId, `Changed access level to ${sensitivityLevel}`]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: `Record access level updated to ${sensitivityLevel}`
+    });
+  } catch (error) {
+    console.error('Error updating record access:', error);
+    res.status(500).json({ error: 'Failed to update record access' });
+  }
+});
+
 module.exports = router;

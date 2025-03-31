@@ -24,30 +24,32 @@ export const AccessLogsViewer: React.FC<AccessLogViewerProps> = ({
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Access Logs">
-      <div className="space-y-4">
-        {loading ? (
-          <div>Loading...</div>
-        ) : (
-          logs.map(log => (
-            <div key={log.id} className="p-4 bg-white/5 rounded-lg">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-white/90">{log.accessedBy}</p>
-                  <p className="text-sm text-white/60">{log.accessorRole}</p>
+      <div className="max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-4">
+          {loading ? (
+            <div>Loading...</div>
+          ) : (
+            logs.map(log => (
+              <div key={log.id} className="p-4 bg-white/5 rounded-lg">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-white/90">{log.accessedBy}</p>
+                    <p className="text-sm text-white/60">{log.accessorRole}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/90">{new Date(log.timestamp).toLocaleDateString()}</p>
+                    <p className="text-sm text-white/60">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-white/90">{new Date(log.timestamp).toLocaleDateString()}</p>
-                  <p className="text-sm text-white/60">{new Date(log.timestamp).toLocaleTimeString()}</p>
-                </div>
+                {log.isEmergency && (
+                  <div className="mt-2 p-2 bg-red-500/10 rounded">
+                    <p className="text-sm text-red-400">Emergency Access: {log.reason}</p>
+                  </div>
+                )}
               </div>
-              {log.isEmergency && (
-                <div className="mt-2 p-2 bg-red-500/10 rounded">
-                  <p className="text-sm text-red-400">Emergency Access: {log.reason}</p>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </Modal>
   );
