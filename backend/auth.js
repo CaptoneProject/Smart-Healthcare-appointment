@@ -3,6 +3,8 @@ const router = express.Router();
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database'); // Use the shared database module
+const { authenticateToken } = require('./middleware/auth'); // Import authenticateToken from middleware
+const { generateTokens } = require('./utils/tokens'); // Import generateTokens from utils
 
 // Register route
 router.post('/register', async (req, res) => {
@@ -128,29 +130,21 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Helper function to generate tokens
-const generateTokens = (user) => {
-  if (!process.env.JWT_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
-    throw new Error('JWT secrets not configured');
-  }
+// Profile routes
+router.get('/profile', authenticateToken, async (req, res) => {
+  // Move profile endpoint from server.js
+});
 
-  const accessToken = jwt.sign(
-    { 
-      userId: user.id, 
-      email: user.email, 
-      userType: user.user_type 
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '24h' }  // Extended from 1h to 24h
-  );
+router.put('/profile', authenticateToken, async (req, res) => {
+  // Move profile update endpoint from server.js
+});
 
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: '7d' }
-  );
+router.post('/refresh-token', async (req, res) => {
+  // Move refresh token endpoint from server.js
+});
 
-  return { accessToken, refreshToken };
-};
+router.post('/logout', authenticateToken, async (req, res) => {
+  // Move logout endpoint from server.js
+});
 
 module.exports = router;

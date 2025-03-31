@@ -1,27 +1,86 @@
 import axios from 'axios';
+import { MedicalRecord, AccessLog, ConsentStatus, Patient } from '../types/medical';
 
 // Base URL for all API requests
 
-// Create axios instance with the correct base URL
+// Create axios instance with standard config
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api', // This already has /api
+  baseURL: 'http://localhost:3000/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-// Ensure the api interceptor correctly sets Authorization header
+// Define retry config outside axios instance
+const RETRY_CONFIG = {
+  retries: 2,
+  initialDelayMs: 1000
+};
+
+// Request interceptor for auth header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('Setting auth header with token');
-  } else {
-    console.log('No token available for request');
   }
   return config;
 });
+
+// Response interceptor with retry logic
+let isRetrying = false;
+
+api.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const config = error.config;
+    
+    // Avoid infinite retry loops
+    if (isRetrying || config._retry) {
+      return Promise.reject(error);
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      isRetrying = true;
+      config._retry = true;
+
+      try {
+        // Handle profile endpoint specially
+        if (config.url === '/auth/profile') {
+          const cachedUser = localStorage.getItem('user');
+          if (cachedUser) {
+            return Promise.resolve({ data: JSON.parse(cachedUser) });
+          }
+        }
+
+        // Implement exponential backoff
+        await new Promise(resolve => 
+          setTimeout(resolve, RETRY_CONFIG.initialDelayMs)
+        );
+
+        const response = await api(config);
+        isRetrying = false;
+        return response;
+      } catch (retryError) {
+        isRetrying = false;
+        return Promise.reject(retryError);
+      }
+    }
+
+    // Handle 401 errors
+    if (error.response?.status === 401) {
+      try {
+        await authService.refreshToken();
+        return api(error.config);
+      } catch (refreshError) {
+        localStorage.clear();
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // Authentication services
 export const authService = {
@@ -68,23 +127,50 @@ export const authService = {
   logout: async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
-      await api.post('/auth/logout', { refreshToken });
-      // Clear localStorage
+      // Set a shorter timeout specifically for logout
+      const logoutPromise = api.post('/auth/logout', { refreshToken }, { timeout: 5000 });
+      
+      // Clear localStorage immediately
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      
+      // Wait for API call but don't block on failure
+      await Promise.race([
+        logoutPromise,
+        new Promise(resolve => setTimeout(resolve, 2000)) // Fallback after 2s
+      ]);
+      
+      return true;
     } catch (error) {
-      // Clear localStorage even if API call fails
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      throw error;
+      console.warn('Logout API call failed, but session was cleared locally');
+      return true; // Still return success since local cleanup is done
     }
   },
   
   getProfile: async () => {
     try {
+      // First try to use cached data
+      const cachedUser = localStorage.getItem('user');
+      if (cachedUser) {
+        // Return cached data immediately
+        const userData = JSON.parse(cachedUser);
+        
+        // Make API call in background to update cache
+        api.get('/auth/profile')
+          .then(response => {
+            localStorage.setItem('user', JSON.stringify(response.data));
+          })
+          .catch(console.warn);
+          
+        return userData;
+      }
+
+      // If no cached data, make the API call
       const response = await api.get('/auth/profile');
       return response.data;
     } catch (error) {
+      console.error('Error fetching profile:', error);
       throw error;
     }
   },
@@ -350,6 +436,45 @@ export const doctorService = {
       console.error('Error fetching available time slots:', error);
       return [];
     }
+  },
+
+  getAssociatedPatients: async (userId: number) => {
+    try {
+      const response = await api.get(`/medical/doctor/patients/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching associated patients:', error);
+      throw error;
+    }
+  },
+
+  uploadMedicalRecord: async (formData: FormData): Promise<MedicalRecord> => {
+    try {
+      const response = await api.post('/medical/records/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading medical record:', error);
+      throw error;
+    }
+  },
+
+  getPatientRecords: async (patientId: number): Promise<MedicalRecord[]> => {
+    try {
+      const response = await api.get(`/medical/records/${patientId}`);
+      return response.data;
+    } catch (error: unknown) {
+      // Type assertion for the error
+      const apiError = error as ApiError;
+      console.error('Error fetching patient records:', apiError);
+      if (apiError.response?.status === 403) {
+        throw new Error('Patient has not provided consent for viewing records');
+      }
+      throw apiError;
+    }
   }
 };
 
@@ -497,6 +622,164 @@ export const adminService = {
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
+    }
+  },
+
+  getPatientRecordsEmergency: async (patientId: number, reason: string): Promise<MedicalRecord[]> => {
+    const response = await api.post('/admin/medical-records/emergency-access', {
+      patientId,
+      reason
+    });
+    return response.data;
+  },
+
+  getMedicalRecordAccessLogs: async (recordId: number): Promise<AccessLog[]> => {
+    const response = await api.get(`/admin/medical-records/${recordId}/access-logs`);
+    return response.data;
+  },
+
+  getAllMedicalRecords: async (): Promise<MedicalRecord[]> => {
+    const response = await api.get('/admin/medical-records');
+    return response.data;
+  },
+
+  updateRecordAccess: async (recordId: number, action: 'restrict' | 'unrestrict') => {
+    const response = await api.put(`/admin/medical-records/${recordId}/access`, { action });
+    return response.data;
+  },
+
+  modifyMedicalRecord: async (recordId: number, updates: Partial<MedicalRecord>) => {
+    const response = await api.put(`/admin/medical-records/${recordId}`, updates);
+    return response.data;
+  },
+  
+  deleteRecord: async (recordId: number, reason: string) => {
+    const response = await api.delete(`/admin/medical-records/${recordId}`, {
+      data: { reason }
+    });
+    return response.data;
+  },
+
+  // Add new analytics methods here
+  getRecordAnalytics: async () => {
+    const response = await api.get('/admin/medical-records/analytics');
+    return response.data as {
+      totalRecords: number;
+      recordsByType: Record<string, number>;
+      recordsByDepartment: Record<string, number>;
+      accessFrequency: {
+        daily: number;
+        weekly: number;
+        monthly: number;
+      };
+    };
+  },
+  
+  getAccessPatterns: async () => {
+    const response = await api.get('/admin/medical-records/access-patterns');
+    return response.data as {
+      mostAccessedRecords: Array<{
+        recordId: number;
+        accessCount: number;
+        lastAccessed: string;
+      }>;
+      emergencyAccessCount: number;
+      unauthorizedAttempts: number;
+      peakAccessTimes: Record<string, number>;
+    };
+  },
+
+  // Add reporting method
+  getAccessSummaryReport: async (params: {
+    startDate?: string;
+    endDate?: string;
+    recordType?: string;
+    department?: string;
+  }) => {
+    const response = await api.get('/admin/reports/access-summary', { params });
+    return response.data;
+  }
+};
+
+// Medical services
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      error?: string;
+    };
+  };
+  message: string;
+}
+
+export const medicalService = {
+  uploadRecord: async (data: FormData): Promise<MedicalRecord> => {
+    try {
+      const response = await api.post('/medical/records/upload', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error('Error uploading medical record:', apiError);
+      throw apiError;
+    }
+  },
+  
+  getPatientRecords: async (patientId: number): Promise<MedicalRecord[]> => {
+    try {
+      console.log('Fetching records for patient:', patientId);
+      const response = await api.get(`/medical/records/${patientId}`);
+      console.log('Received records:', response.data);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error('Error fetching patient records:', apiError);
+      if (apiError.response?.status === 403) {
+        throw new Error('Patient has not provided consent for viewing records');
+      }
+      throw apiError;
+    }
+  },
+  
+  getAssociatedPatients: async (doctorId: number): Promise<Patient[]> => {
+    try {
+      const response = await api.get(`/medical/doctor/patients/${doctorId}`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error('Error fetching associated patients:', apiError);
+      throw apiError;
+    }
+  },
+  
+  getRecordAccessLogs: async (recordId: number) => {
+    const response = await api.get(`/medical/records/${recordId}/access-logs`);
+    return response.data;
+  },
+
+  getConsentStatus: async (): Promise<ConsentStatus> => {
+    const response = await api.get('/medical/consent');
+    return response.data;
+  },
+
+  updateConsent: async (consent: boolean): Promise<ConsentStatus> => {
+    const response = await api.post('/medical/consent', { consent });
+    return response.data;
+  },
+
+  getOwnRecords: async (): Promise<MedicalRecord[]> => {
+    try {
+      // Use /records/patient instead of /records/{userId}
+      const response = await api.get('/medical/records/patient');
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error('Error fetching own records:', apiError);
+      // Add this return statement to fix the TypeScript error
+      return [];  // Return empty array on error
     }
   }
 };

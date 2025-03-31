@@ -445,4 +445,177 @@ router.delete('/users/:id', isAdmin, async (req, res) => {
   }
 });
 
+// Emergency access endpoint
+router.post('/medical-records/emergency-access', isAdmin, async (req, res) => {
+  try {
+    const { patientId, reason } = req.body;
+    
+    // Log the emergency access attempt
+    await db.query(
+      `INSERT INTO medical_record_access_logs 
+       (record_id, accessed_by, reason, is_emergency)
+       VALUES ($1, $2, $3, true)`,
+      [null, req.user.userId, reason]
+    );
+
+    // Get patient records with emergency override
+    const records = await db.query(
+      `SELECT mr.*, u.name as doctor_name
+       FROM medical_records mr
+       JOIN users u ON mr.doctor_id = u.id
+       WHERE mr.patient_id = $1`,
+      [patientId]
+    );
+
+    // Log system activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id)
+       VALUES ($1, $2, $3)`,
+      ['EMERGENCY_ACCESS', 
+       `Emergency access to patient ${patientId}'s records by ${req.user.name}`,
+       req.user.userId]
+    );
+
+    res.json(records.rows);
+  } catch (error) {
+    console.error('Error in emergency access:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add to adminRoutes.js
+router.get('/medical-records/audit-trail', isAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        ma.id,
+        ma.record_id,
+        ma.accessed_by,
+        ma.access_type,
+        ma.timestamp,
+        ma.is_emergency,
+        ma.reason,
+        u.name as accessor_name,
+        u.user_type as accessor_role
+      FROM medical_record_access_logs ma
+      JOIN users u ON ma.accessed_by = u.id
+      ORDER BY ma.timestamp DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch audit trail' });
+  }
+});
+
+router.get('/audit-trail', isAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        a.id,
+        a.type,
+        a.message,
+        a.timestamp,
+        a.user_id,
+        u.name as user_name,
+        u.user_type
+      FROM system_activities a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.type LIKE 'MEDICAL_RECORD%'
+      ORDER BY a.timestamp DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch audit trail' });
+  }
+});
+
+// Add after existing routes
+router.get('/medical-records/analytics', isAdmin, async (req, res) => {
+  try {
+    // Get total records count
+    const totalRecords = await db.query(
+      'SELECT COUNT(*) FROM medical_records'
+    );
+
+    // Get records by type
+    const recordsByType = await db.query(`
+      SELECT type, COUNT(*) as count 
+      FROM medical_records 
+      GROUP BY type
+    `);
+
+    // Get records by department
+    const recordsByDepartment = await db.query(`
+      SELECT department, COUNT(*) as count 
+      FROM medical_records 
+      GROUP BY department
+    `);
+
+    // Get access frequency
+    const accessFrequency = await db.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '24 HOURS') as daily,
+        COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '7 DAYS') as weekly,
+        COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '30 DAYS') as monthly
+      FROM medical_record_access_logs
+    `);
+
+    res.json({
+      totalRecords: totalRecords.rows[0].count,
+      recordsByType: recordsByType.rows,
+      recordsByDepartment: recordsByDepartment.rows,
+      accessFrequency: accessFrequency.rows[0]
+    });
+  } catch (error) {
+    console.error('Error getting analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+router.get('/medical-records/access-patterns', isAdmin, async (req, res) => {
+  try {
+    const patterns = await db.query(`
+      SELECT 
+        mr.id as record_id,
+        COUNT(mal.id) as access_count,
+        MAX(mal.timestamp) as last_accessed,
+        SUM(CASE WHEN mal.is_emergency THEN 1 ELSE 0 END) as emergency_count
+      FROM medical_records mr
+      LEFT JOIN medical_record_access_logs mal ON mr.id = mal.record_id
+      GROUP BY mr.id
+      ORDER BY access_count DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      mostAccessedRecords: patterns.rows,
+      emergencyAccessCount: patterns.rows.reduce((acc, curr) => acc + parseInt(curr.emergency_count), 0)
+    });
+  } catch (error) {
+    console.error('Error getting access patterns:', error);
+    res.status(500).json({ error: 'Failed to fetch access patterns' });
+  }
+});
+
+// Add this endpoint to fetch all medical records for admin
+router.get('/medical-records', isAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        mr.*,
+        p.name as patient_name,
+        d.name as doctor_name
+      FROM medical_records mr
+      LEFT JOIN users p ON mr.patient_id = p.id
+      LEFT JOIN users d ON mr.doctor_id = d.id AND d.user_type = 'doctor'
+      ORDER BY mr.created_at DESC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching all medical records:', error);
+    res.status(500).json({ error: 'Failed to fetch medical records' });
+  }
+});
+
 module.exports = router;

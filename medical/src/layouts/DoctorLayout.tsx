@@ -3,7 +3,6 @@ import {
   Hospital, 
   Calendar, 
   FileText, 
-  Users, 
   User,
   LogOut,
   Clock,
@@ -22,9 +21,8 @@ const DoctorLayout = () => {
   const navigationItems = [
     { path: '/d/dashboard', label: 'Dashboard', icon: Home },
     { path: '/d/appointments', label: 'Appointments', icon: Calendar },
-    { path: '/d/patients', label: 'Patients', icon: Users },
-    { path: '/d/medical-records', label: 'Medical Records', icon: FileText },
     { path: '/d/schedule', label: 'My Schedule', icon: Clock },
+    { path: '/d/records', label: 'Medical Records', icon: FileText },
   ];
 
   const handleLogout = async () => {

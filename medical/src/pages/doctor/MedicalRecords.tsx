@@ -1,0 +1,339 @@
+import React, { useState, useEffect } from 'react';
+import { Card } from '../../components/ui/Card';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { Eye, Plus, Search, FileText, Shield } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { medicalService } from '../../services/api';
+import MedicalRecordForm from '../../components/forms/MedicalRecordForm';
+import { RecordDetailsModal } from '../../components/modals/RecordDetailsModal';
+import { AccessHistoryModal } from '../../components/modals/AccessHistoryModal';
+import { MedicalRecord } from '../../types/medical';
+import { toast } from 'react-toastify';
+
+interface Patient {
+  id: number;
+  name: string;
+  email: string;
+  consent_given: boolean;
+  records?: MedicalRecord[];
+}
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const DoctorMedicalRecords: React.FC = () => {
+  const { user } = useAuth();
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [patientRecords, setPatientRecords] = useState<MedicalRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isViewRecordsModalOpen, setIsViewRecordsModalOpen] = useState(false);
+  const [isRecordDetailsOpen, setIsRecordDetailsOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
+  const [accessLogs, setAccessLogs] = useState<any[]>([]);
+  const [isAccessHistoryOpen, setIsAccessHistoryOpen] = useState(false);
+  const [accessLoading, setAccessLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      if (!user?.id) return;
+
+      try {
+        setLoading(true);
+        const data = await medicalService.getAssociatedPatients(user.id);
+        setPatients(data);
+      } catch (err) {
+        console.error('Error fetching patients:', err);
+        setError('Failed to load patient list');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPatients();
+  }, [user?.id]);
+
+  const filteredPatients = patients.filter(patient =>
+    patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patient.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleViewRecordDetails = (record: MedicalRecord) => {
+    setSelectedRecord(record);
+    setIsRecordDetailsOpen(true);
+  };
+
+  const handleViewFileUrl = async (fileUrl: string): Promise<void> => {
+    try {
+      if (!fileUrl) {
+        toast.error('No file URL available');
+        return;
+      }
+      window.open(fileUrl, '_blank');
+    } catch (error) {
+      console.error('Error opening file:', error);
+      toast.error('Failed to open file');
+    }
+  };
+
+  const handleDownloadRecord = async (record: MedicalRecord): Promise<void> => {
+    try {
+      const fileUrl = record.file_url;
+      if (!fileUrl) {
+        toast.error('No file URL available');
+        return;
+      }
+      window.open(fileUrl, '_blank');
+    } catch (error) {
+      console.error('Error opening file:', error);
+      toast.error('Failed to open file');
+    }
+  };
+
+  const handleUpload = async (formData: FormData) => {
+    try {
+      setLoading(true);
+      await medicalService.uploadRecord(formData);
+
+      if (selectedPatient) {
+        const records = await medicalService.getPatientRecords(selectedPatient.id);
+        setPatientRecords(records);
+      }
+
+      setIsUploadModalOpen(false);
+    } catch (error) {
+      console.error('Error uploading record:', error);
+      setError('Failed to upload medical record');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewRecords = async (patientId: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Find and set the selected patient before fetching records
+      const patient = patients.find(p => p.id === patientId);
+      setSelectedPatient(patient || null);
+      
+      const records = await medicalService.getPatientRecords(patientId);
+      setPatientRecords(records);
+      setIsViewRecordsModalOpen(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch records');
+      setPatientRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewAccessHistory = async (recordId: number) => {
+    try {
+      setAccessLoading(true);
+      console.log('Fetching access logs for record:', recordId);
+      const logs = await medicalService.getRecordAccessLogs(recordId);
+      setAccessLogs(logs);
+      setIsAccessHistoryOpen(true);
+    } catch (err) {
+      console.error('Error fetching access logs:', err);
+      toast.error('Failed to fetch access history');
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  const filteredRecords = patientRecords.filter(record => {
+    if (!searchQuery) return true;
+    
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      record.title.toLowerCase().includes(searchLower) ||
+      record.type.toLowerCase().includes(searchLower) ||
+      record.department.toLowerCase().includes(searchLower)
+    );
+  });
+
+  return (
+    <div className="space-y-6 p-6">
+      <PageHeader 
+        title={`Medical Records - ${selectedPatient?.name || ''}`}
+        description="View and manage patient medical records"
+      />
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        </div>
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search patients..."
+              className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredPatients.length === 0 ? (
+              <p className="text-gray-400 col-span-full text-center py-8">
+                No patients found
+              </p>
+            ) : (
+              filteredPatients.map(patient => (
+                <Card key={patient.id} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium text-lg text-white/90">{patient.name}</h3>
+                      <p className="text-white/60">{patient.email}</p>
+                      
+                      <div className="mt-4">
+                        {patient.consent_given ? (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleViewRecords(patient.id)}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Records
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedPatient(patient);
+                                setIsUploadModalOpen(true);
+                              }}
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add Record
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-yellow-400 text-sm flex items-center">
+                            <Shield className="w-4 h-4 mr-1" />
+                            Pending Consent
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      <Modal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        title={`Upload Medical Record - ${selectedPatient?.name}`}
+      >
+        {selectedPatient && (
+          <MedicalRecordForm
+            patientId={selectedPatient.id}
+            onSubmit={handleUpload}
+            onCancel={() => setIsUploadModalOpen(false)}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={isViewRecordsModalOpen}
+        onClose={() => setIsViewRecordsModalOpen(false)}
+        title={`Medical Records - ${selectedPatient?.name}`}
+      >
+        <div className="space-y-4">
+          {filteredRecords.length === 0 ? (
+            <p className="text-center text-gray-500">No records found</p>
+          ) : (
+            filteredRecords.map((record) => (
+              <div 
+                key={record.id} 
+                className="p-4 bg-white/5 rounded-lg border border-white/10"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium text-white/90">{record.title}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-white/60">
+                        Type: {record.type}
+                      </span>
+                      <span className="text-sm text-white/60">
+                        Added: {formatDate(record.created_at)}
+                      </span>
+                    </div>
+                    {record.content && (
+                      <p className="mt-2 text-sm text-white/70">
+                        {record.content.substring(0, 100)}...
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewFileUrl(record.file_url)}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      View File
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewRecordDetails(record)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      <RecordDetailsModal
+        isOpen={isRecordDetailsOpen}
+        onClose={() => setIsRecordDetailsOpen(false)}
+        record={selectedRecord || {} as MedicalRecord}
+        onDownload={handleDownloadRecord}
+        onViewHistory={handleViewAccessHistory}
+      />
+
+      <AccessHistoryModal 
+        isOpen={isAccessHistoryOpen}
+        onClose={() => setIsAccessHistoryOpen(false)}
+        recordId={selectedRecord?.id || 0}
+        accessLogs={accessLogs}
+        isLoading={accessLoading}
+      />
+    </div>
+  );
+};
+
+export default DoctorMedicalRecords;

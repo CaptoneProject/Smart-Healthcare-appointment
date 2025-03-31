@@ -22,6 +22,8 @@ import AccountRejected from './pages/doctor/AccountRejected';
 import UserManagement from './pages/admin/UserManagement';
 import AppointmentsManagement from './pages/admin/AppointmentsManagement';
 import ActivityLog from './pages/admin/ActivityLog'; // Import the new ActivityLog component
+import MedicalRecords from './pages/doctor/MedicalRecords'; // Import the new MedicalRecords component
+import MedicalRecordsManagement from './pages/admin/MedicalRecordsManagement'; // Import the new MedicalRecordsManagement component
 
 // Update the ProtectedRoute to handle admin routes with better logging
 const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
@@ -112,7 +114,7 @@ const AppWithAuth = () => {
         <Route path="schedule" element={<DoctorSchedule />} />
         <Route path="credentials" element={<DoctorCredentialsForm />} />
         <Route path="appointments" element={<DoctorAppointments />} />
-        {/* Other doctor routes */}
+        <Route path="records" element={<MedicalRecords />} /> {/* New route */}
       </Route>
       
       {/* Standalone doctor routes */}
@@ -129,6 +131,7 @@ const AppWithAuth = () => {
       
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="doctor-approvals" element={
           <ErrorBoundary>
@@ -138,6 +141,11 @@ const AppWithAuth = () => {
         <Route path="users" element={<UserManagement />} />
         <Route path="appointments" element={<AppointmentsManagement />} />
         <Route path="activity-log" element={<ActivityLog />} /> {/* New route */}
+        <Route path="medical-records" element={
+          <ErrorBoundary>
+            <MedicalRecordsManagement />
+          </ErrorBoundary>
+        } />
         {/* Other admin routes */}
       </Route>
       

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('./database'); // Add this line to use the shared database module
 const { normalizeTime } = require('./utils/dateTime');
+const { authenticateToken, isAdmin } = require('./middleware/auth');
 
 // Initialize tables
 const initTables = async () => {

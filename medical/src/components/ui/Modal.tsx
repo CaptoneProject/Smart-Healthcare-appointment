@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title?: string; // Make title optional
   children: ReactNode;
   className?: string;
 }
@@ -25,7 +25,7 @@ export const Modal: React.FC<ModalProps> = ({
         border border-white/10 p-6 shadow-xl ${className}`}>
         <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-white/0 pointer-events-none" />
         <div className="relative">
-          <h2 className="text-xl font-semibold mb-4 text-white/90">{title}</h2>
+          {title && <h2 className="text-xl font-semibold mb-4 text-white/90">{title}</h2>}
           {children}
           <button 
             onClick={onClose}

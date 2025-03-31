@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell } from 'lucide-react';
+import { 
+  Bell, 
+  FileText, 
+  Eye, 
+  Calendar, 
+  CheckCircle, 
+  XCircle,
+  Clock as ClockIcon
+} from 'lucide-react';
 import { notificationService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -11,7 +19,21 @@ interface Notification {
   is_read: boolean;
   created_at: string;
   type: string;
+  metadata?: {
+    recordId?: number;
+    doctorId?: number;
+    patientId?: number;
+    appointmentId?: number;
+  };
 }
+
+export const NotificationTypes = {
+  APPOINTMENT_SCHEDULED: 'APPOINTMENT_SCHEDULED',
+  APPOINTMENT_CONFIRMED: 'APPOINTMENT_CONFIRMED',
+  APPOINTMENT_CANCELLED: 'APPOINTMENT_CANCELLED',
+  MEDICAL_RECORD_UPLOADED: 'MEDICAL_RECORD_UPLOADED',
+  MEDICAL_RECORD_ACCESSED: 'MEDICAL_RECORD_ACCESSED'
+} as const;
 
 export const NotificationBell: React.FC = () => {
   const { user } = useAuth();
@@ -20,6 +42,25 @@ export const NotificationBell: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'MEDICAL_RECORD_UPLOADED':
+        return <FileText className="w-4 h-4 text-blue-400" />;
+      case 'MEDICAL_RECORD_ACCESSED':
+        return <Eye className="w-4 h-4 text-green-400" />;
+      case 'APPOINTMENT_SCHEDULED':
+        return <Calendar className="w-4 h-4 text-yellow-400" />;
+      case 'APPOINTMENT_CONFIRMED':
+        return <CheckCircle className="w-4 h-4 text-green-400" />;
+      case 'APPOINTMENT_CANCELLED':
+        return <XCircle className="w-4 h-4 text-red-400" />;
+      case 'APPOINTMENT_RESCHEDULED':
+        return <ClockIcon className="w-4 h-4 text-orange-400" />;
+      default:
+        return <Bell className="w-4 h-4 text-blue-400" />;
+    }
+  };
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -45,7 +86,8 @@ export const NotificationBell: React.FC = () => {
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    // Refresh every 15 seconds instead of 30
+    const interval = setInterval(fetchNotifications, 15000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
@@ -135,20 +177,25 @@ export const NotificationBell: React.FC = () => {
                   className={`p-4 border-b border-white/10 hover:bg-white/5 
                     ${!notification.is_read ? 'bg-blue-500/10' : ''}`}
                 >
-                  <p className="text-sm text-white/90 mb-1">{notification.title}</p>
-                  <p className="text-sm text-white/60">{notification.message}</p>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-white/40">
-                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                    </span>
-                    {!notification.is_read && (
-                      <button 
-                        className="text-xs text-blue-400 hover:text-blue-300"
-                        onClick={() => handleMarkAsRead(notification.id)}
-                      >
-                        Mark as read
-                      </button>
-                    )}
+                  <div className="flex items-start gap-3">
+                    {getNotificationIcon(notification.type)}
+                    <div className="flex-1">
+                      <p className="text-sm text-white/90 mb-1">{notification.title}</p>
+                      <p className="text-sm text-white/60">{notification.message}</p>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-xs text-white/40">
+                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                        </span>
+                        {!notification.is_read && (
+                          <button 
+                            className="text-xs text-blue-400 hover:text-blue-300"
+                            onClick={() => handleMarkAsRead(notification.id)}
+                          >
+                            Mark as read
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))

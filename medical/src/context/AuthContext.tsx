@@ -35,25 +35,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadUser = async () => {
       try {
+        setLoading(true);
         const token = localStorage.getItem('accessToken');
+        
         if (!token) {
           setLoading(false);
           return;
         }
 
+        // Try to load cached user first
+        const cachedUser = localStorage.getItem('user');
+        if (cachedUser) {
+          setUser(JSON.parse(cachedUser));
+          setLoading(false);
+        }
+
+        // Then update from API
         const userData = await authService.getProfile();
         setUser(userData);
       } catch (err) {
         console.error('Failed to load user', err);
-        
-        try {
-          await authService.refreshToken();
-          const userData = await authService.getProfile();
-          setUser(userData);
-        } catch (refreshErr) {
-          console.error('Token refresh failed', refreshErr);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+        // Use cached data if API fails
+        const cachedUser = localStorage.getItem('user');
+        if (cachedUser) {
+          setUser(JSON.parse(cachedUser));
+        } else {
+          setUser(null);
         }
       } finally {
         setLoading(false);
@@ -119,7 +126,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.register(userData);
       setUser(response.user);
       
-      // Add admin case to the routing logic
       switch (response.user.userType) {
         case 'patient':
           navigate('/p/dashboard');

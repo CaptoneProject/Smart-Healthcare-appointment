@@ -8,7 +8,8 @@ import {
   Bell,
   LogOut,
   Shield,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,6 +24,7 @@ const AdminLayout = () => {
     { icon: Users, label: 'User Management', path: '/admin/users' },
     { icon: Calendar, label: 'Appointments', path: '/admin/appointments' },
     { icon: Settings, label: 'System Settings', path: '/admin/settings' },
+    { path: '/admin/medical-records', label: 'Medical Records', icon: FileText },
   ];
 
   const handleLogout = async () => {

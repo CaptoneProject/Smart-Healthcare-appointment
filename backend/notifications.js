@@ -268,8 +268,13 @@ const getNotificationTitle = (type, isForDoctor = false) => {
         ? 'Appointment Rescheduled' 
         : 'Appointment Rescheduled';
       
+    case 'MEDICAL_RECORD_UPLOADED':
+      return isForDoctor 
+        ? 'Medical Record Uploaded' 
+        : 'New Medical Record Available';
+      
     default:
-      return 'Appointment Update';
+      return 'System Update';
   }
 };
 
@@ -344,8 +349,13 @@ const getNotificationMessage = (type, appointment, isForDoctor = false) => {
         `Your appointment with Dr. ${appointment.doctor_name} has been rescheduled from ${oldDateStr} at ${oldTimeStr} to ${newDateStr} at ${newTimeStr}`;
     }
       
+    case 'MEDICAL_RECORD_UPLOADED':
+      return isForDoctor
+        ? `You have uploaded a medical record "${appointment.title}" for patient ${appointment.patientName}`
+        : `Dr. ${appointment.doctorName} has uploaded a new medical record "${appointment.title}" to your health records`;
+      
     default:
-      return `Appointment status has been updated`;
+      return `System has been updated`;
   }
 };
 
@@ -371,6 +381,45 @@ router.put('/read-all', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Fix the sendMedicalRecordNotification function
+const sendMedicalRecordNotification = async (data) => {
+  try {
+    console.log('Creating medical record notification for patient:', data.patientId);
+    
+    // Format the record type to be more readable (capitalize first letter)
+    const recordType = data.type ? 
+      data.type.charAt(0).toUpperCase() + data.type.slice(1).toLowerCase() : 
+      'Record';
+    
+    // Create notification for patient with type included
+    const notification = await createNotification({
+      userId: data.patientId,
+      type: 'MEDICAL_RECORD_UPLOADED',
+      title: `New ${recordType} Available`,
+      message: `Dr. ${data.doctorName} has uploaded a new ${recordType.toLowerCase()} "${data.title}" to your health records`,
+      relatedId: data.recordId
+    });
+    
+    console.log('Created notification:', notification);
+
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'MEDICAL_RECORD_UPLOADED',
+        `${recordType} "${data.title}" uploaded by Dr. ${data.doctorName} for patient ${data.patientName}`,
+        data.recordId
+      ]
+    );
+
+    return notification;
+  } catch (error) {
+    console.error('Error sending medical record notification:', error);
+    throw error;
+  }
+};
 
 module.exports = {
   router,
@@ -414,5 +463,6 @@ module.exports = {
     } catch (error) {
       console.error('Error sending appointment notification:', error);
     }
-  }
+  },
+  sendMedicalRecordNotification
 };
