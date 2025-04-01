@@ -18,7 +18,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
-import { appointmentService } from '../../services/api';
+import { appointmentService, medicalService } from '../../services/api';
 import { formatDate, formatFullDate, formatTime } from '../../utils/dateTime';
 
 interface DashboardCardProps {
@@ -159,11 +159,21 @@ const PatientDashboard: React.FC = () => {
           (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
         );
         
-        // Update stats with only confirmed appointments
+        // Add this new code to fetch medical records count
+        let recentDocumentsCount = 0;
+        try {
+          // Option 1: If your API supports counting records directly
+          const medicalRecordsData = await medicalService.getOwnRecords();
+          recentDocumentsCount = medicalRecordsData.length;
+        } catch (error) {
+          console.error('Error fetching medical records:', error);
+        }
+        
+        // Update stats with all values
         setStats({
           upcomingAppointments: confirmedAppointments.length,
-          activePrescriptions: 0,
-          recentDocuments: 0,
+          activePrescriptions: 0, // You can add a similar call for prescriptions if needed
+          recentDocuments: recentDocumentsCount,
           pendingPayments: 0
         });
 
