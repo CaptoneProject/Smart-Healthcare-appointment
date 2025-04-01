@@ -711,6 +711,11 @@ export const adminService = {
   }) => {
     const response = await api.get('/admin/reports/access-summary', { params });
     return response.data;
+  },
+
+  getRecordsWithEmergencyAccess: async (): Promise<MedicalRecord[]> => {
+    const response = await api.get('/admin/medical-records/emergency');
+    return response.data;
   }
 };
 

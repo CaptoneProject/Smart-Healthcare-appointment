@@ -450,14 +450,6 @@ router.post('/records/emergency-access', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: 'Patient ID and reason are required' });
     }
 
-    // Log the emergency access attempt
-    await db.query(
-      `INSERT INTO medical_record_access_logs 
-       (record_id, accessed_by, reason, is_emergency)
-       VALUES ($1, $2, $3, true)`,
-      [null, req.user.userId, reason]
-    );
-
     // Get all records for the patient, including restricted ones
     const records = await db.query(
       `SELECT 
@@ -470,6 +462,17 @@ router.post('/records/emergency-access', authenticateToken, async (req, res) => 
        WHERE mr.patient_id = $1`,
       [patientId]
     );
+
+    // Critical fix: Log emergency access for EACH record this patient has
+    // This ensures each record shows up in emergency access filters
+    for (const record of records.rows) {
+      await db.query(
+        `INSERT INTO medical_record_access_logs 
+         (record_id, accessed_by, reason, is_emergency)
+         VALUES ($1, $2, $3, true)`,
+        [record.id, req.user.userId, reason]
+      );
+    }
 
     // Log the system activity
     await db.query(

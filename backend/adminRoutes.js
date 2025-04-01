@@ -725,4 +725,28 @@ router.get('/medical-records/emergency-access', isAdmin, async (req, res) => {
   }
 });
 
+// This endpoint retrieves records that have had emergency access
+router.get('/medical-records/emergency', isAdmin, async (req, res) => {
+  try {
+    // Get records that have had emergency access
+    const result = await db.query(`
+      SELECT DISTINCT 
+        mr.*, 
+        p.name as patient_name,
+        d.name as doctor_name
+      FROM medical_records mr
+      JOIN medical_record_access_logs mal ON mr.id = mal.record_id
+      LEFT JOIN users p ON mr.patient_id = p.id
+      LEFT JOIN users d ON mr.doctor_id = d.id
+      WHERE mal.is_emergency = true
+      ORDER BY mr.created_at DESC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching emergency access records:', error);
+    res.status(500).json({ error: 'Failed to fetch records with emergency access' });
+  }
+});
+
 module.exports = router;

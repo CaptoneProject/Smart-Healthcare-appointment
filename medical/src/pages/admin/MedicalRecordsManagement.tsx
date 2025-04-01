@@ -78,30 +78,44 @@ const MedicalRecordsManagement: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const data = await adminService.getAllMedicalRecords();
-
+      // For better performance when looking at emergency records, use a specialized endpoint
       if (activeFilter === 'emergency') {
-        const recordsWithLogs = await Promise.all(
-          data.map(async (record) => {
-            try {
-              const logs = await adminService.getMedicalRecordAccessLogs(record.id);
-              const hasEmergencyAccess = logs.some(log => log.isEmergency === true);
-              return {
-                ...record,
-                has_emergency_access: hasEmergencyAccess
-              };
-            } catch (error) {
-              console.error(`Error checking emergency logs for record ${record.id}:`, error);
-              return {
-                ...record,
-                has_emergency_access: false
-              };
-            }
-          })
-        );
-
-        setRecords(recordsWithLogs);
+        try {
+          // Try to use the special emergency records endpoint (faster)
+          const emergencyRecords = await adminService.getRecordsWithEmergencyAccess();
+          const recordsWithProp = emergencyRecords.map(record => ({
+            ...record,
+            has_emergency_access: true
+          }));
+          setRecords(recordsWithProp);
+        } catch (error) {
+          console.error('Error fetching emergency records, falling back to manual check:', error);
+          
+          // Fall back to the current method if the endpoint isn't working
+          const data = await adminService.getAllMedicalRecords();
+          const recordsWithLogs = await Promise.all(
+            data.map(async (record) => {
+              try {
+                const logs = await adminService.getMedicalRecordAccessLogs(record.id);
+                const hasEmergencyAccess = logs.some(log => log.isEmergency === true);
+                return {
+                  ...record,
+                  has_emergency_access: hasEmergencyAccess
+                };
+              } catch (error) {
+                console.error(`Error checking emergency logs for record ${record.id}:`, error);
+                return {
+                  ...record,
+                  has_emergency_access: false
+                };
+              }
+            })
+          );
+          setRecords(recordsWithLogs);
+        }
       } else {
+        // For non-emergency filters, just get all records (this is fine)
+        const data = await adminService.getAllMedicalRecords();
         const recordsWithProp = data.map(record => ({
           ...record,
           has_emergency_access: false
