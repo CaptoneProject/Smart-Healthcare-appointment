@@ -6,108 +6,108 @@ const { upload } = require('./s3Config'); // Update import to destructure upload
 const { sendMedicalRecordNotification } = require('./notifications');
 
 // Initialize tables
-const initMedicalTables = async () => {
-  try {
-    // Create medical records table
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS medical_records (
-        id SERIAL PRIMARY KEY,
-        patient_id INTEGER REFERENCES users(id),
-        doctor_id INTEGER REFERENCES users(id),
-        title VARCHAR(255) NOT NULL,
-        type VARCHAR(100) NOT NULL,
-        department VARCHAR(100) NOT NULL,
-        file_url TEXT NOT NULL,
-        sensitivity_level VARCHAR(50) NOT NULL,
-        content TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+// const initMedicalTables = async () => {
+//   try {
+//     // Create medical records table
+//     await db.query(`
+//       CREATE TABLE IF NOT EXISTS medical_records (
+//         id SERIAL PRIMARY KEY,
+//         patient_id INTEGER REFERENCES users(id),
+//         doctor_id INTEGER REFERENCES users(id),
+//         title VARCHAR(255) NOT NULL,
+//         type VARCHAR(100) NOT NULL,
+//         department VARCHAR(100) NOT NULL,
+//         file_url TEXT NOT NULL,
+//         sensitivity_level VARCHAR(50) NOT NULL,
+//         content TEXT,
+//         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+//         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//       );
+//     `);
 
-    // Add NOT NULL constraint to doctor_id if not already present
-    await db.query(`
-      DO $$ 
-      BEGIN
-        ALTER TABLE medical_records ALTER COLUMN doctor_id SET NOT NULL;
-      EXCEPTION
-        WHEN others THEN
-          -- Silently handle errors
-          NULL;
-      END $$;
-    `);
+//     // Add NOT NULL constraint to doctor_id if not already present
+//     await db.query(`
+//       DO $$ 
+//       BEGIN
+//         ALTER TABLE medical_records ALTER COLUMN doctor_id SET NOT NULL;
+//       EXCEPTION
+//         WHEN others THEN
+//           -- Silently handle errors
+//           NULL;
+//       END $$;
+//     `);
 
-    // Create patient consent table
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS patient_consent (
-        patient_id INTEGER PRIMARY KEY REFERENCES users(id),
-        consent_given BOOLEAN DEFAULT false,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+//     // Create patient consent table
+//     await db.query(`
+//       CREATE TABLE IF NOT EXISTS patient_consent (
+//         patient_id INTEGER PRIMARY KEY REFERENCES users(id),
+//         consent_given BOOLEAN DEFAULT false,
+//         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//       );
+//     `);
 
-    // Create access log table with proper constraints
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS medical_record_access_logs (
-        id SERIAL PRIMARY KEY,
-        record_id INTEGER NOT NULL,
-        accessed_by INTEGER NOT NULL,
-        access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        reason TEXT,
-        is_emergency BOOLEAN DEFAULT false,
-        CONSTRAINT fk_record FOREIGN KEY (record_id) REFERENCES medical_records(id) ON DELETE CASCADE,
-        CONSTRAINT fk_user FOREIGN KEY (accessed_by) REFERENCES users(id) ON DELETE CASCADE
-      );
-    `);
+//     // Create access log table with proper constraints
+//     await db.query(`
+//       CREATE TABLE IF NOT EXISTS medical_record_access_logs (
+//         id SERIAL PRIMARY KEY,
+//         record_id INTEGER NOT NULL,
+//         accessed_by INTEGER NOT NULL,
+//         access_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+//         reason TEXT,
+//         is_emergency BOOLEAN DEFAULT false,
+//         CONSTRAINT fk_record FOREIGN KEY (record_id) REFERENCES medical_records(id) ON DELETE CASCADE,
+//         CONSTRAINT fk_user FOREIGN KEY (accessed_by) REFERENCES users(id) ON DELETE CASCADE
+//       );
+//     `);
 
-    // Add any missing constraints if table already exists
-    await db.query(`
-      DO $$ 
-      BEGIN
-        -- Add NOT NULL constraints if they don't exist
-        ALTER TABLE medical_record_access_logs 
-        ALTER COLUMN record_id SET NOT NULL,
-        ALTER COLUMN accessed_by SET NOT NULL;
+//     // Add any missing constraints if table already exists
+//     await db.query(`
+//       DO $$ 
+//       BEGIN
+//         -- Add NOT NULL constraints if they don't exist
+//         ALTER TABLE medical_record_access_logs 
+//         ALTER COLUMN record_id SET NOT NULL,
+//         ALTER COLUMN accessed_by SET NOT NULL;
         
-        -- Add foreign key constraints if they don't exist
-        IF NOT EXISTS (
-          SELECT 1 
-          FROM information_schema.table_constraints 
-          WHERE constraint_name = 'fk_record'
-        ) THEN
-          ALTER TABLE medical_record_access_logs
-          ADD CONSTRAINT fk_record 
-          FOREIGN KEY (record_id) 
-          REFERENCES medical_records(id) 
-          ON DELETE CASCADE;
-        END IF;
+//         -- Add foreign key constraints if they don't exist
+//         IF NOT EXISTS (
+//           SELECT 1 
+//           FROM information_schema.table_constraints 
+//           WHERE constraint_name = 'fk_record'
+//         ) THEN
+//           ALTER TABLE medical_record_access_logs
+//           ADD CONSTRAINT fk_record 
+//           FOREIGN KEY (record_id) 
+//           REFERENCES medical_records(id) 
+//           ON DELETE CASCADE;
+//         END IF;
 
-        IF NOT EXISTS (
-          SELECT 1 
-          FROM information_schema.table_constraints 
-          WHERE constraint_name = 'fk_user'
-        ) THEN
-          ALTER TABLE medical_record_access_logs
-          ADD CONSTRAINT fk_user 
-          FOREIGN KEY (accessed_by) 
-          REFERENCES users(id)
-          ON DELETE CASCADE;
-        END IF;
-      EXCEPTION
-        WHEN others THEN
-          -- Handle any errors silently
-          NULL;
-      END $$;
-    `);
+//         IF NOT EXISTS (
+//           SELECT 1 
+//           FROM information_schema.table_constraints 
+//           WHERE constraint_name = 'fk_user'
+//         ) THEN
+//           ALTER TABLE medical_record_access_logs
+//           ADD CONSTRAINT fk_user 
+//           FOREIGN KEY (accessed_by) 
+//           REFERENCES users(id)
+//           ON DELETE CASCADE;
+//         END IF;
+//       EXCEPTION
+//         WHEN others THEN
+//           -- Handle any errors silently
+//           NULL;
+//       END $$;
+//     `);
 
-    console.log('Medical records tables initialized successfully');
-  } catch (error) {
-    console.error('Error initializing medical records tables:', error);
-  }
-};
+//     console.log('Medical records tables initialized successfully');
+//   } catch (error) {
+//     console.error('Error initializing medical records tables:', error);
+//   }
+// };
 
 // Call initialization
-initMedicalTables();
+// initMedicalTables();
 
 // Middleware to check consent
 const checkConsent = async (req, res, next) => {

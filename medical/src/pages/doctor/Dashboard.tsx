@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { 
   Calendar, 
   Clock, 
-  UserPlus, 
   FileText, 
   ArrowRight,
   User,
@@ -245,13 +244,7 @@ const DoctorDashboard: React.FC = () => {
       footer: "View all",
       link: "/d/appointments?filter=pending_approval" // Updated link with filter query param
     },
-    {
-      icon: UserPlus,
-      title: "Patients",
-      value: loading ? "..." : "Manage",
-      footer: "View patients",
-      link: "/d/patients"
-    },
+    
     {
       icon: FileText,
       title: "Medical Records",
@@ -268,12 +261,6 @@ const DoctorDashboard: React.FC = () => {
       title: "Update Schedule",
       description: "Manage your availability",
       to: "/d/schedule"
-    },
-    {
-      icon: UserPlus,
-      title: "Patient Management",
-      description: "Update patient records",
-      to: "/d/patients"
     },
     {
       icon: Clock,

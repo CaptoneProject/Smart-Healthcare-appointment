@@ -7,51 +7,51 @@ const db = require('./database'); // This is the shared database configuration!
 const { normalizeDate, normalizeTime } = require('./utils/dateTime');
 
 // Initialize tables
-const initTables = async () => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS appointments (
-      id SERIAL PRIMARY KEY,
-      patient_id INTEGER REFERENCES users(id),
-      doctor_id INTEGER REFERENCES users(id),
+// const initTables = async () => {
+//   await db.query(`
+//     CREATE TABLE IF NOT EXISTS appointments (
+//       id SERIAL PRIMARY KEY,
+//       patient_id INTEGER REFERENCES users(id),
+//       doctor_id INTEGER REFERENCES users(id),
 
-      time TIME NOT NULL,
-      duration INTEGER NOT NULL, -- in minutes
-      type VARCHAR(50),
-      status VARCHAR(20) DEFAULT 'scheduled',
-      notes TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+//       time TIME NOT NULL,
+//       duration INTEGER NOT NULL, -- in minutes
+//       type VARCHAR(50),
+//       status VARCHAR(20) DEFAULT 'scheduled',
+//       notes TEXT,
+//       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+//       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//     );
 
-    CREATE TABLE IF NOT EXISTS doctor_availability (
-      id SERIAL PRIMARY KEY,
-      doctor_id INTEGER REFERENCES users(id),
-      day_of_week INTEGER, -- 0 = Sunday, 6 = Saturday
-      start_time TIME,
-      end_time TIME
-    );
-  `);
+//     CREATE TABLE IF NOT EXISTS doctor_availability (
+//       id SERIAL PRIMARY KEY,
+//       doctor_id INTEGER REFERENCES users(id),
+//       day_of_week INTEGER, -- 0 = Sunday, 6 = Saturday
+//       start_time TIME,
+//       end_time TIME
+//     );
+//   `);
   
-  // Add column if it doesn't exist
-  try {
-    await db.query(`
-      ALTER TABLE appointments 
-      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    `);
-    await db.query(`
-      ALTER TABLE appointments 
-      ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0
-    `);
-    await db.query(`
-      ALTER TABLE appointments 
-      ADD COLUMN IF NOT EXISTS date DATE NOT NULL DEFAULT CURRENT_DATE;
-    `);
-  } catch (error) {
-    console.error('Error adding updated_at column:', error);
-  }
-};
+//   // Add column if it doesn't exist
+//   try {
+//     await db.query(`
+//       ALTER TABLE appointments 
+//       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//     `);
+//     await db.query(`
+//       ALTER TABLE appointments 
+//       ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0
+//     `);
+//     await db.query(`
+//       ALTER TABLE appointments 
+//       ADD COLUMN IF NOT EXISTS date DATE NOT NULL DEFAULT CURRENT_DATE;
+//     `);
+//   } catch (error) {
+//     console.error('Error adding updated_at column:', error);
+//   }
+// };
 
-initTables();
+// initTables();
 
 // Update checkAvailability function
 const checkAvailability = async (doctorId, date, time) => {

@@ -16,25 +16,25 @@ const isAdmin = (req, res, next) => {
 };
 
 // Initialize the system_activities table if it doesn't exist
-const initSystemActivitiesTable = async () => {
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS system_activities (
-        id SERIAL PRIMARY KEY,
-        type VARCHAR(50) NOT NULL,
-        message TEXT NOT NULL,
-        related_id INTEGER,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    console.log('System activities table initialized');
-  } catch (error) {
-    console.error('Error creating system_activities table:', error);
-  }
-};
+// const initSystemActivitiesTable = async () => {
+//   try {
+//     await db.query(`
+//       CREATE TABLE IF NOT EXISTS system_activities (
+//         id SERIAL PRIMARY KEY,
+//         type VARCHAR(50) NOT NULL,
+//         message TEXT NOT NULL,
+//         related_id INTEGER,
+//         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+//       )
+//     `);
+//     console.log('System activities table initialized');
+//   } catch (error) {
+//     console.error('Error creating system_activities table:', error);
+//   }
+// };
 
 // Call the initialization function
-initSystemActivitiesTable();
+// initSystemActivitiesTable();
 
 // Function to log system activities
 const logSystemActivity = async (type, message, relatedId = null) => {

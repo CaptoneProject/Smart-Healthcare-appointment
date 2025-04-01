@@ -32,29 +32,6 @@ const initNotificationsTable = async () => {
 // Add this to ensure the table is recreated with the correct schema
 initNotificationsTable();
 
-// Initialize tables
-const initTables = async () => {
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS notifications (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        type VARCHAR(50) NOT NULL,
-        title VARCHAR(100) NOT NULL,
-        message TEXT NOT NULL,
-        related_id INTEGER,
-        is_read BOOLEAN DEFAULT false,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-  } catch (error) {
-    console.error('Error creating notifications table:', error);
-  }
-};
-
-// Call this when your server starts
-initTables();
-
 // Email configuration
 const emailTransporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
