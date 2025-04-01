@@ -189,93 +189,58 @@ router.get('/records/patient', authenticateToken, async (req, res) => {
   }
 });
 
-// Update the GET records endpoint for better error handling and doctor info
+// Update the GET medical records endpoint
 router.get('/records/:patientId', authenticateToken, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { userId, userType } = req.user;
 
-    console.log(`Request to fetch records for patient ${patientId} by user ${userId} (${userType})`);
-
-    // For doctors and admins, check if consent exists
-    if (userType === 'doctor' || userType === 'admin') {
-      const consentResult = await db.query(
-        'SELECT consent_given FROM patient_consent WHERE patient_id = $1',
-        [patientId]
-      );
-
-      // If no consent record exists at all, create one with default false
-      if (consentResult.rows.length === 0) {
-        console.log(`No consent record found for patient ${patientId}, creating default`);
-        await db.query(
-          `INSERT INTO patient_consent (patient_id, consent_given) 
-           VALUES ($1, true)`, // Set to TRUE for testing
-          [patientId]
-        );
-      } else if (!consentResult.rows[0]?.consent_given) {
-        console.log(`Patient ${patientId} has not given consent, forcing consent for testing`);
-        await db.query(
-          `UPDATE patient_consent 
-           SET consent_given = true 
-           WHERE patient_id = $1`, // Set to TRUE for testing
-          [patientId]
-        );
-      }
-    }
-
-    // MODIFIED QUERY: Use CASE statements for doctor_id and doctor_name
-    const records = await db.query(`
+    // Base query to get medical records
+    let query = `
       SELECT 
         mr.*,
-        CASE 
-          WHEN mr.doctor_id IS NULL THEN ${userId} -- Use current user's ID as fallback
-          ELSE mr.doctor_id
-        END as doctor_id,
-        CASE
-          WHEN mr.doctor_id IS NULL THEN (SELECT name FROM users WHERE id = ${userId})
-          ELSE doc.name
-        END as doctor_name,
-        pat.name as patient_name
+        d.name as doctor_name,
+        p.name as patient_name
       FROM medical_records mr
-      LEFT JOIN users doc ON mr.doctor_id = doc.id
-      LEFT JOIN users pat ON mr.patient_id = pat.id
+      LEFT JOIN users d ON mr.doctor_id = d.id
+      LEFT JOIN users p ON mr.patient_id = p.id
       WHERE mr.patient_id = $1
-      ORDER BY mr.created_at DESC
-    `, [patientId]);
-
-    console.log(`Found ${records.rows.length} records for patient ${patientId}`);
+    `;
     
-    // Additional debug logging
-    if (records.rows.length > 0) {
-      console.log('First record:', records.rows[0]);
-    } else {
-      console.log('No records found - Additional debugging:');
-      const basicRecords = await db.query(
-        'SELECT * FROM medical_records WHERE patient_id = $1',
-        [patientId]
+    const queryParams = [patientId];
+    
+    // Apply restriction logic based on user type
+    if (userType === 'doctor' && parseInt(userId) !== parseInt(patientId)) {
+      // Doctors can see:
+      // 1. All unrestricted records
+      // 2. Restricted records they personally created
+      query += ` AND (mr.sensitivity_level != 'restricted' OR mr.doctor_id = $2)`;
+      queryParams.push(userId);
+    } else if (userType !== 'admin' && userType !== 'patient') {
+      // Other non-patient, non-admin users (like nurses, staff)
+      // can only see unrestricted records
+      query += ` AND mr.sensitivity_level != 'restricted'`;
+    }
+    
+    // Order by most recent first
+    query += ` ORDER BY mr.created_at DESC`;
+    
+    const result = await db.query(query, queryParams);
+    
+    // Log this access for audit trail
+    for (const record of result.rows) {
+      await db.query(
+        `INSERT INTO medical_record_access_logs 
+         (record_id, accessed_by, reason, is_emergency)
+         VALUES ($1, $2, $3, false)`,
+        [record.id, userId, 'Standard record access']
       );
-      console.log(`Raw record count: ${basicRecords.rows.length}`);
     }
-
-    // Log the access
-    if (records.rows.length > 0) {
-      for (const record of records.rows) {
-        await db.query(
-          `INSERT INTO medical_record_access_logs 
-           (record_id, accessed_by, reason, is_emergency)
-           VALUES ($1, $2, $3, $4)`,
-          [record.id, userId, 'Routine check', false]
-        );
-      }
-    }
-
-    res.json(records.rows);
+    
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching medical records:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch medical records',
-      details: error.message
-    });
+    res.status(500).json({ error: 'Failed to fetch medical records' });
   }
 });
 
@@ -461,6 +426,60 @@ router.post('/medical-records/emergency-access', authenticateToken, isAdmin, asy
         `Emergency access to patient ${patientId}'s records`,
         req.user.id,
         patientId
+      ]
+    );
+
+    res.json(records.rows);
+  } catch (error) {
+    console.error('Error in emergency access:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this endpoint for doctor emergency access to medical records
+router.post('/records/emergency-access', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is a doctor
+    if (req.user.userType !== 'doctor') {
+      return res.status(403).json({ error: 'Only doctors can request emergency access' });
+    }
+
+    const { patientId, reason } = req.body;
+    
+    if (!patientId || !reason) {
+      return res.status(400).json({ error: 'Patient ID and reason are required' });
+    }
+
+    // Log the emergency access attempt
+    await db.query(
+      `INSERT INTO medical_record_access_logs 
+       (record_id, accessed_by, reason, is_emergency)
+       VALUES ($1, $2, $3, true)`,
+      [null, req.user.userId, reason]
+    );
+
+    // Get all records for the patient, including restricted ones
+    const records = await db.query(
+      `SELECT 
+        mr.*,
+        d.name as doctor_name,
+        p.name as patient_name
+       FROM medical_records mr
+       LEFT JOIN users d ON mr.doctor_id = d.id
+       LEFT JOIN users p ON mr.patient_id = p.id
+       WHERE mr.patient_id = $1`,
+      [patientId]
+    );
+
+    // Log the system activity
+    await db.query(
+      `INSERT INTO system_activities 
+       (type, message, related_id)
+       VALUES ($1, $2, $3)`,
+      [
+        'EMERGENCY_ACCESS',
+        `Emergency access to patient ${patientId}'s records by doctor ${req.user.userId}`,
+        req.user.userId
       ]
     );
 
@@ -687,6 +706,29 @@ router.post('/fix-patient-as-doctor-records', authenticateToken, isAdmin, async 
   } catch (error) {
     console.error('Error fixing records:', error);
     res.status(500).json({ error: 'Failed to fix records' });
+  }
+});
+
+// Add this endpoint to get restricted records count
+router.get('/patients/:patientId/restricted-count', authenticateToken, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { userId } = req.user;
+    
+    // Count restricted records that this doctor didn't create
+    const result = await db.query(
+      `SELECT COUNT(*) 
+       FROM medical_records
+       WHERE patient_id = $1
+       AND sensitivity_level = 'restricted'
+       AND doctor_id != $2`,
+      [patientId, userId]
+    );
+    
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error('Error counting restricted records:', error);
+    res.status(500).json({ error: 'Failed to count restricted records' });
   }
 });
 

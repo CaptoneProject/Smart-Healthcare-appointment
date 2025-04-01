@@ -9,6 +9,11 @@ import { AlertTriangle } from 'lucide-react';
 import { adminService } from '../../services/api';
 import { MedicalRecord, AccessLog } from '../../types/medical';
 
+// Extend MedicalRecord interface to include emergency access property
+interface ExtendedMedicalRecord extends MedicalRecord {
+  has_emergency_access?: boolean;
+}
+
 interface AccessLogViewerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,14 +61,12 @@ export const AccessLogsViewer: React.FC<AccessLogViewerProps> = ({
 };
 
 const MedicalRecordsManagement: React.FC = () => {
-  const [records, setRecords] = useState<MedicalRecord[]>([]);
+  const [records, setRecords] = useState<ExtendedMedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
   const [showAccessLogs, setShowAccessLogs] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
-  const [emergencyReason, setEmergencyReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [isRecordDetailsOpen, setIsRecordDetailsOpen] = useState(false);
@@ -74,8 +77,37 @@ const MedicalRecordsManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+
       const data = await adminService.getAllMedicalRecords();
-      setRecords(data);
+
+      if (activeFilter === 'emergency') {
+        const recordsWithLogs = await Promise.all(
+          data.map(async (record) => {
+            try {
+              const logs = await adminService.getMedicalRecordAccessLogs(record.id);
+              const hasEmergencyAccess = logs.some(log => log.isEmergency === true);
+              return {
+                ...record,
+                has_emergency_access: hasEmergencyAccess
+              };
+            } catch (error) {
+              console.error(`Error checking emergency logs for record ${record.id}:`, error);
+              return {
+                ...record,
+                has_emergency_access: false
+              };
+            }
+          })
+        );
+
+        setRecords(recordsWithLogs);
+      } else {
+        const recordsWithProp = data.map(record => ({
+          ...record,
+          has_emergency_access: false
+        }));
+        setRecords(recordsWithProp);
+      }
     } catch (error) {
       setError('Failed to fetch medical records');
       console.error('Error fetching records:', error);
@@ -86,7 +118,7 @@ const MedicalRecordsManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRecords();
-  }, []);
+  }, [activeFilter]);
 
   const handleViewRecord = (record: MedicalRecord) => {
     setSelectedRecord(record);
@@ -106,18 +138,19 @@ const MedicalRecordsManagement: React.FC = () => {
     }
   };
 
-  const confirmEmergencyAccess = async () => {
-    if (!selectedPatientId || !emergencyReason) return;
-
+  const viewEmergencyDetails = async (recordId: number) => {
     try {
-      const records = await adminService.getPatientRecordsEmergency(
-        selectedPatientId,
-        emergencyReason
-      );
-      setRecords(records);
+      // Fetch all access logs for this record
+      const logs = await adminService.getMedicalRecordAccessLogs(recordId);
+
+      // Filter only emergency access logs
+      const emergencyLogs = logs.filter(log => log.isEmergency);
+
+      setAccessLogs(emergencyLogs);
+      setShowAccessLogs(true);
       setShowEmergencyModal(false);
     } catch (error) {
-      console.error('Error accessing emergency records:', error);
+      console.error('Error fetching emergency access logs:', error);
     }
   };
 
@@ -130,7 +163,6 @@ const MedicalRecordsManagement: React.FC = () => {
   const handleAccessControl = async (recordId: number, action: 'restrict' | 'unrestrict') => {
     try {
       await adminService.updateRecordAccess(recordId, action);
-      // Refresh records
       fetchRecords();
     } catch (error) {
       console.error('Failed to update record access');
@@ -147,13 +179,28 @@ const MedicalRecordsManagement: React.FC = () => {
   };
 
   const filteredRecords = records.filter(record => {
-    if (!searchQuery) return true;
-    
-    return (
+    const matchesSearch = searchQuery ? (
       record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.department.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+      record.department?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (record.patient_name && record.patient_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ) : true;
+
+    if (!matchesSearch) return false;
+
+    switch (activeFilter) {
+      case 'recent':
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        return new Date(record.created_at) >= oneWeekAgo;
+
+      case 'emergency':
+        return record.has_emergency_access === true;
+
+      case 'all':
+      default:
+        return true;
+    }
   });
 
   const BulkActions = () => {
@@ -198,7 +245,6 @@ const MedicalRecordsManagement: React.FC = () => {
         description="System-wide medical records access and monitoring"
       />
 
-      {/* Add error display */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
           <div className="flex items-start">
@@ -211,7 +257,6 @@ const MedicalRecordsManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Add loading state */}
       {loading ? (
         <div className="flex justify-center items-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/20"></div>
@@ -224,14 +269,13 @@ const MedicalRecordsManagement: React.FC = () => {
             options={[
               { id: 'all', label: 'All Records' },
               { id: 'recent', label: 'Recently Added' },
-              { id: 'emergency', label: 'Emergency Access' }
+              { id: 'emergency', label: 'Records with Emergency Access' }
             ]}
             searchPlaceholder="Search records..."
             onSearchChange={setSearchQuery}
             searchValue={searchQuery}
           />
 
-          {/* Records Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredRecords.map(record => (
               <RecordCard
@@ -240,10 +284,6 @@ const MedicalRecordsManagement: React.FC = () => {
                 onViewRecord={handleViewRecord}
                 onViewAccessLogs={() => handleViewAccessLogs(record.id)}
                 showPatientInfo
-                onEmergencyAccess={() => {
-                  setSelectedPatientId(record.patient_id);
-                  setShowEmergencyModal(true);
-                }}
                 onAccessControlChange={(action) => handleAccessControl(record.id, action)}
                 isSelected={selectedRecords.includes(record.id)}
                 onSelect={(selected) => {
@@ -259,53 +299,40 @@ const MedicalRecordsManagement: React.FC = () => {
         </>
       )}
 
-      {/* Add BulkActions component */}
       <BulkActions />
 
-      {/* Emergency Access Modal */}
       <Modal
         isOpen={showEmergencyModal}
         onClose={() => setShowEmergencyModal(false)}
-        title="Emergency Access Authorization"
+        title="Emergency Access Details"
       >
         <div className="space-y-4">
-          <div className="flex items-start p-4 bg-red-500/10 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 mr-3" />
-            <div>
-              <h4 className="font-medium text-white/90">Emergency Access Request</h4>
-              <p className="text-sm text-white/70">
-                This action will be logged and monitored. Please provide a valid reason.
-              </p>
-            </div>
-          </div>
-
-          <textarea
-            className="w-full bg-white/5 border border-white/10 rounded-lg p-3"
-            placeholder="Enter reason for emergency access..."
-            value={emergencyReason}
-            onChange={(e) => setEmergencyReason(e.target.value)}
-            rows={4}
-          />
-
+          <p className="text-white/80">
+            This record has been accessed through emergency procedures.
+            View the access logs for more details.
+          </p>
+          
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="ghost"
               onClick={() => setShowEmergencyModal(false)}
             >
-              Cancel
+              Close
             </Button>
             <Button
               variant="primary"
-              onClick={confirmEmergencyAccess}
-              disabled={!emergencyReason}
+              onClick={() => {
+                if (selectedRecord) {
+                  viewEmergencyDetails(selectedRecord.id);
+                }
+              }}
             >
-              Confirm Emergency Access
+              View Emergency Access Logs
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Access Logs Viewer */}
       <AccessLogsViewer
         isOpen={showAccessLogs}
         onClose={() => setShowAccessLogs(false)}
@@ -316,7 +343,7 @@ const MedicalRecordsManagement: React.FC = () => {
       <RecordDetailsModal 
         isOpen={isRecordDetailsOpen}
         onClose={() => setIsRecordDetailsOpen(false)}
-        record={selectedRecord || {} as MedicalRecord} // Provide a default empty record
+        record={selectedRecord || {} as MedicalRecord}
         onViewHistory={(recordId: number) => handleViewAccessLogs(recordId)}
         onDownload={handleDownload}
       />

@@ -707,4 +707,22 @@ router.put('/medical-records/:id/access', isAdmin, async (req, res) => {
   }
 });
 
+// Add this endpoint to get records with emergency access
+router.get('/medical-records/emergency-access', isAdmin, async (req, res) => {
+  try {
+    // Get records that have had emergency access
+    const result = await db.query(
+      `SELECT DISTINCT mr.* 
+       FROM medical_records mr
+       JOIN medical_record_access_logs mal ON mr.id = mal.record_id
+       WHERE mal.is_emergency = true`
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching emergency access records:', error);
+    res.status(500).json({ error: 'Failed to fetch records with emergency access' });
+  }
+});
+
 module.exports = router;

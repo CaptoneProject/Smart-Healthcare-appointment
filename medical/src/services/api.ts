@@ -475,6 +475,19 @@ export const doctorService = {
       }
       throw apiError;
     }
+  },
+
+  getPatientRecordsEmergency: async (patientId: number, reason: string): Promise<MedicalRecord[]> => {
+    try {
+      const response = await api.post('/medical/records/emergency-access', {
+        patientId,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error accessing emergency records:', error);
+      throw error;
+    }
   }
 };
 
@@ -780,6 +793,29 @@ export const medicalService = {
       console.error('Error fetching own records:', apiError);
       // Add this return statement to fix the TypeScript error
       return [];  // Return empty array on error
+    }
+  },
+
+  getRestrictedRecordsCount: async (patientId: number): Promise<number> => {
+    try {
+      const response = await api.get(`/medical/patients/${patientId}/restricted-count`);
+      return response.data.count;
+    } catch (error) {
+      console.error('Error fetching restricted records count:', error);
+      return 0; // Default to 0 if there's an error
+    }
+  },
+
+  getPatientRecordsEmergency: async (patientId: number, reason: string): Promise<MedicalRecord[]> => {
+    try {
+      const response = await api.post('/medical/records/emergency-access', {
+        patientId,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error accessing emergency records:', error);
+      throw error;
     }
   }
 };

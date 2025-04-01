@@ -3,7 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { Eye, Plus, Search, FileText, Shield } from 'lucide-react';
+import { Eye, Plus, Search, FileText, Shield, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { medicalService } from '../../services/api';
 import MedicalRecordForm from '../../components/forms/MedicalRecordForm';
@@ -32,6 +32,8 @@ const formatDate = (dateString: string) => {
 const DoctorMedicalRecords: React.FC = () => {
   const { user } = useAuth();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
   const [patientRecords, setPatientRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,10 @@ const DoctorMedicalRecords: React.FC = () => {
   const [accessLogs, setAccessLogs] = useState<any[]>([]);
   const [isAccessHistoryOpen, setIsAccessHistoryOpen] = useState(false);
   const [accessLoading, setAccessLoading] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [showEmergencyPatientModal, setShowEmergencyPatientModal] = useState(false);
+  const [restrictedRecordsCount, setRestrictedRecordsCount] = useState<Record<number, number>>({});
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -53,6 +59,18 @@ const DoctorMedicalRecords: React.FC = () => {
         setLoading(true);
         const data = await medicalService.getAssociatedPatients(user.id);
         setPatients(data);
+
+        // Get restricted records count for each patient
+        const restrictedCounts: Record<number, number> = {};
+        for (const patient of data) {
+          try {
+            const count = await medicalService.getRestrictedRecordsCount(patient.id);
+            restrictedCounts[patient.id] = count;
+          } catch (err) {
+            console.error(`Error fetching restricted records count for patient ${patient.id}:`, err);
+          }
+        }
+        setRestrictedRecordsCount(restrictedCounts);
       } catch (err) {
         console.error('Error fetching patients:', err);
         setError('Failed to load patient list');
@@ -127,7 +145,7 @@ const DoctorMedicalRecords: React.FC = () => {
       // Find and set the selected patient before fetching records
       const patient = patients.find(p => p.id === patientId);
       setSelectedPatient(patient || null);
-      
+
       const records = await medicalService.getPatientRecords(patientId);
       setPatientRecords(records);
       setIsViewRecordsModalOpen(true);
@@ -154,9 +172,72 @@ const DoctorMedicalRecords: React.FC = () => {
     }
   };
 
+  const handleEmergencyAccess = async (recordId: number) => {
+    setShowEmergencyModal(true);
+    setSelectedRecordId(recordId);
+  };
+
+  const handleEmergencyPatientSelect = async (patientId: number) => {
+    try {
+      setSelectedPatientId(patientId);
+      setShowEmergencyPatientModal(false);
+      setEmergencyReason('');
+      setShowEmergencyModal(true);
+    } catch (error) {
+      console.error('Error selecting patient for emergency access:', error);
+    }
+  };
+
+  const confirmEmergencyAccess = async () => {
+    try {
+      // Use selectedRecordId or selectedPatientId as needed
+      if ((!selectedPatientId && !selectedRecordId) || !emergencyReason) return;
+
+      if (selectedRecordId) {
+        // Instead of using a non-existent method, use the patient emergency access 
+        // with the record's patient ID
+        const record = patientRecords.find(r => r.id === selectedRecordId);
+        if (record) {
+          // Request emergency access for this specific patient
+          const records = await medicalService.getPatientRecordsEmergency(
+            record.patient_id,
+            emergencyReason
+          );
+          
+          // Find the specific record in the returned data
+          const updatedRecord = records.find(r => r.id === selectedRecordId);
+          if (updatedRecord) {
+            // Update the UI to show the record
+            setSelectedRecord(updatedRecord);
+            setIsRecordDetailsOpen(true);
+          }
+        }
+      } else if (selectedPatientId) {
+        // Request emergency access for all patient records (existing flow)
+        const restrictedRecords = await medicalService.getPatientRecordsEmergency(
+          selectedPatientId,
+          emergencyReason
+        );
+
+        // Show the records after emergency access is granted
+        const patient = patients.find(p => p.id === selectedPatientId);
+        setSelectedPatient(patient || null);
+        setPatientRecords(restrictedRecords);
+        setIsViewRecordsModalOpen(true);
+      }
+
+      setShowEmergencyModal(false);
+      setEmergencyReason('');
+      setSelectedRecordId(null);
+    } catch (error) {
+      console.error('Error confirming emergency access:', error);
+      toast.error('Failed to confirm emergency access');
+    }
+  };
+
   const filteredRecords = patientRecords.filter(record => {
     if (!searchQuery) return true;
-    
+
     const searchLower = searchQuery.toLowerCase();
     return (
       record.title.toLowerCase().includes(searchLower) ||
@@ -170,6 +251,16 @@ const DoctorMedicalRecords: React.FC = () => {
       <PageHeader 
         title={`Medical Records - ${selectedPatient?.name || ''}`}
         description="View and manage patient medical records"
+        action={
+          <Button 
+            variant="danger" 
+            onClick={() => setShowEmergencyPatientModal(true)}
+            className="flex items-center"
+          >
+            <Shield className="w-4 h-4 mr-2" />
+            Emergency Access
+          </Button>
+        }
       />
 
       {error && (
@@ -207,7 +298,7 @@ const DoctorMedicalRecords: React.FC = () => {
                     <div>
                       <h3 className="font-medium text-lg text-white/90">{patient.name}</h3>
                       <p className="text-white/60">{patient.email}</p>
-                      
+
                       <div className="mt-4">
                         {patient.consent_given ? (
                           <div className="flex gap-2">
@@ -236,6 +327,14 @@ const DoctorMedicalRecords: React.FC = () => {
                             <Shield className="w-4 h-4 mr-1" />
                             Pending Consent
                           </span>
+                        )}
+                        {patient.consent_given && restrictedRecordsCount[patient.id] > 0 && (
+                          <div className="mt-2 flex items-center">
+                            <Shield className="w-4 h-4 mr-1 text-red-400" />
+                            <span className="text-sm text-red-400">
+                              {restrictedRecordsCount[patient.id]} restricted records
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -309,6 +408,14 @@ const DoctorMedicalRecords: React.FC = () => {
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEmergencyAccess(record.id)}
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-1" />
+                      Emergency Access
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -332,6 +439,85 @@ const DoctorMedicalRecords: React.FC = () => {
         accessLogs={accessLogs}
         isLoading={accessLoading}
       />
+
+      <Modal
+        isOpen={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+        title="Emergency Access Authorization"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start p-4 bg-red-500/10 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 mr-3" />
+            <div>
+              <h4 className="font-medium text-white/90">Emergency Access Request</h4>
+              <p className="text-sm text-white/70">
+                You are requesting emergency access to a restricted medical record.
+                This action will be logged and monitored. Please provide a valid reason.
+              </p>
+            </div>
+          </div>
+
+          <textarea
+            className="w-full bg-white/5 border border-white/10 rounded-lg p-3"
+            placeholder="Enter reason for emergency access..."
+            value={emergencyReason}
+            onChange={(e) => setEmergencyReason(e.target.value)}
+            rows={4}
+          />
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button variant="ghost" onClick={() => setShowEmergencyModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={confirmEmergencyAccess}
+              disabled={!emergencyReason}
+            >
+              Confirm Emergency Access
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showEmergencyPatientModal}
+        onClose={() => setShowEmergencyPatientModal(false)}
+        title="Emergency Access to Restricted Records"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-500/10 p-4 rounded-lg">
+            <p className="text-white/80">
+              Select a patient to request emergency access to their restricted medical records.
+              This action is for emergency situations only and will be thoroughly logged.
+            </p>
+          </div>
+
+          <div className="divide-y divide-white/10">
+            {patients.filter(p => restrictedRecordsCount[p.id] > 0).map(patient => (
+              <div key={patient.id} className="py-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-medium text-white/90">{patient.name}</h4>
+                    <p className="text-sm text-white/60">{restrictedRecordsCount[patient.id]} restricted records</p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleEmergencyPatientSelect(patient.id)}
+                  >
+                    Request Access
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {patients.filter(p => restrictedRecordsCount[p.id] > 0).length === 0 && (
+              <p className="text-center py-4 text-white/60">No patients with restricted records</p>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

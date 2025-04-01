@@ -1,7 +1,7 @@
 export interface MedicalRecord {
   id: number;
   patient_id: number;
-  patient_name?: string;  // Add this property
+  patient_name?: string;
   doctor_id: number;
   doctor_name?: string;
   title: string;
@@ -12,6 +12,7 @@ export interface MedicalRecord {
   content?: string;
   created_at: string;
   updated_at: string;
+  has_emergency_access?: boolean; // Add this property
 }
 
 export interface MedicalRecordUpload {

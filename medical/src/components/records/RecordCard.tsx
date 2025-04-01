@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Eye, Download, Shield } from 'lucide-react';
+import { Calendar, Eye, Download, Shield, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { MedicalRecord } from '../../types/medical';
 
@@ -87,6 +87,22 @@ export const RecordCard: React.FC<RecordCardProps> = ({
           <p className="text-white/70 text-sm line-clamp-2">
             {record.content}
           </p>
+        )}
+
+        {record.sensitivity_level === 'restricted' && (
+          <div className="mt-3 flex items-center p-2 bg-red-500/20 rounded-lg">
+            <Shield className="w-4 h-4 mr-2 text-red-400" />
+            <p className="text-xs text-red-400 font-medium">Restricted Access</p>
+          </div>
+        )}
+
+        {record.has_emergency_access && (
+          <div className="mt-2 p-2 bg-red-500/10 rounded-lg">
+            <p className="text-xs flex items-center text-red-400">
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              This record has been accessed via emergency procedures
+            </p>
+          </div>
         )}
 
         <div className="flex justify-between items-center pt-4 border-t border-white/10">
