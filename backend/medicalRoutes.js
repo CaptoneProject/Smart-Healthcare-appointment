@@ -616,6 +616,68 @@ router.put('/records/:id/make-public', authenticateToken, async (req, res) => {
   }
 });
 
+// Update this endpoint for getting signed URLs for file viewing
+router.get('/records/:id/signed-url', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { preview } = req.query; // Add this to differentiate preview vs download
+    
+    // Get the file URL from the database
+    const record = await db.query(
+      'SELECT file_url FROM medical_records WHERE id = $1',
+      [id]
+    );
+    
+    if (record.rows.length === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    
+    const fileUrl = record.rows[0].file_url;
+    
+    // Debug the file URL to see what it contains
+    console.log('File URL from database:', fileUrl);
+    
+    // Extract S3 key from the URL
+    const key = fileUrl.split('.amazonaws.com/')[1];
+    
+    if (!key) {
+      return res.status(400).json({ error: 'Invalid file URL format' });
+    }
+    
+    // Debug the extracted key
+    console.log('Extracted S3 key:', key);
+    
+    // Generate a signed URL with content disposition for viewing in browser
+    const { s3 } = require('./s3Config');
+    const isPreview = preview !== 'false';
+    
+    // Try-catch specifically around the getSignedUrl call
+    try {
+      const signedUrl = await s3.getSignedUrl(key, isPreview);
+      
+      // Log this access for audit trail
+      await db.query(
+        `INSERT INTO medical_record_access_logs 
+         (record_id, accessed_by, reason, is_emergency)
+         VALUES ($1, $2, $3, false)`,
+        [id, req.user.userId, isPreview ? 'File viewed' : 'File downloaded']
+      );
+      
+      res.json({ 
+        signedUrl,
+        contentType: s3.getContentType(key),
+        message: 'Signed URL generated successfully'
+      });
+    } catch (s3Error) {
+      console.error('S3 error generating signed URL:', s3Error);
+      res.status(500).json({ error: 'Failed to generate file access URL', details: s3Error.message });
+    }
+  } catch (error) {
+    console.error('Error generating signed URL:', error);
+    res.status(500).json({ error: 'Failed to generate file access URL' });
+  }
+});
+
 // Add this debug endpoint temporarily to test
 router.get('/debug-records/:patientId', authenticateToken, async (req, res) => {
   try {

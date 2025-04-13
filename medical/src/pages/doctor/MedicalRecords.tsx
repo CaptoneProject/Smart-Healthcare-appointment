@@ -92,31 +92,71 @@ const DoctorMedicalRecords: React.FC = () => {
     setIsRecordDetailsOpen(true);
   };
 
-  const handleViewFileUrl = async (fileUrl: string): Promise<void> => {
+  const handleViewFileUrl = async (recordId: number, fileUrl: string): Promise<void> => {
     try {
       if (!fileUrl) {
         toast.error('No file URL available');
         return;
       }
+      
+      if (!recordId) {
+        toast.error('Record ID not available');
+        return;
+      }
+      
+      // First try the signed URL approach
+      try {
+        const response = await medicalService.getSignedUrl(recordId, true);
+        if (response && response.signedUrl) {
+          // Open the signed URL in a new tab
+          window.open(response.signedUrl, '_blank');
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to get signed URL, falling back to direct URL:', e);
+      }
+      
+      // Fallback: Try to open the file URL directly
+      // This helps if the signed URL generation is failing
       window.open(fileUrl, '_blank');
     } catch (error) {
       console.error('Error opening file:', error);
-      toast.error('Failed to open file');
+      toast.error('Failed to open file for preview');
     }
   };
 
   const handleDownloadRecord = async (record: MedicalRecord): Promise<void> => {
     try {
-      const fileUrl = record.file_url;
-      if (!fileUrl) {
-        toast.error('No file URL available');
+      if (!record.id) {
+        toast.error('Record ID not available');
         return;
       }
-      window.open(fileUrl, '_blank');
+      
+      // Request a signed URL for downloading the file - set preview to false for download
+      const response = await medicalService.getSignedUrl(record.id, false);
+      if (response && response.signedUrl) {
+        // Create an invisible anchor element to trigger download
+        const link = document.createElement('a');
+        link.href = response.signedUrl;
+        // Set download attribute to force download instead of opening in browser
+        link.setAttribute('download', `${record.title || 'medical-record'}.${getFileExtension(record.file_url)}`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        toast.error('Failed to generate download URL');
+      }
     } catch (error) {
-      console.error('Error opening file:', error);
-      toast.error('Failed to open file');
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download file');
     }
+  };
+
+  // Helper function to extract file extension
+  const getFileExtension = (fileUrl: string): string => {
+    if (!fileUrl) return 'pdf';
+    const parts = fileUrl.split('.');
+    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'pdf';
   };
 
   const handleUpload = async (formData: FormData) => {
@@ -395,7 +435,7 @@ const DoctorMedicalRecords: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleViewFileUrl(record.file_url)}
+                      onClick={() => handleViewFileUrl(record.id, record.file_url)}
                     >
                       <FileText className="w-4 h-4 mr-1" />
                       View File

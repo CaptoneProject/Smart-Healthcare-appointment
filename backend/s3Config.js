@@ -39,20 +39,43 @@ const upload = multer({
 
 // Create an S3 utility object without ACL operations
 const s3 = {
-  getSignedUrl: async (key) => {
+  getSignedUrl: async (key, isPreview = true) => {
     try {
+      console.log('Generating signed URL for key:', key);
+      console.log('Preview mode:', isPreview);
+      
       const command = new GetObjectCommand({
         Bucket: process.env.AWS_BUCKET_NAME || 'smartcare-medical-records-2025',
         Key: key,
-        // Use long expiration for testing
-        Expires: 3600
+        // Add response parameters for proper browser display
+        ResponseContentDisposition: isPreview ? 'inline' : 'attachment',
+        ResponseContentType: getContentType(key)
       });
+      
       return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
     } catch (error) {
       console.error('Error generating signed URL:', error);
       throw error;
     }
-  }
+  },
+  
+  getContentType: getContentType // Export the function
 };
+
+// Add this helper function to determine content type
+function getContentType(key) {
+  const extension = key.split('.').pop().toLowerCase();
+  const contentTypeMap = {
+    'pdf': 'application/pdf',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  };
+  
+  return contentTypeMap[extension] || 'application/octet-stream';
+}
 
 module.exports = { upload, s3Client, s3 };

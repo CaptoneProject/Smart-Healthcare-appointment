@@ -822,6 +822,17 @@ export const medicalService = {
       console.error('Error accessing emergency records:', error);
       throw error;
     }
+  },
+  
+  // Add the getSignedUrl method here
+  getSignedUrl: async (recordId: number, preview: boolean = true) => {
+    try {
+      const response = await api.get(`/medical/records/${recordId}/signed-url?preview=${preview}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting signed URL:', error);
+      throw error;
+    }
   }
 };
 
