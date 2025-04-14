@@ -190,6 +190,33 @@ async function initDatabase() {
     `);
     console.log('Patient visits table initialized');
 
+    // 10. Initialize payment and invoice tables
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES users(id),
+        appointment_id INTEGER REFERENCES appointments(id),
+        amount DECIMAL(10,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        due_date DATE NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER REFERENCES invoices(id),
+        patient_id INTEGER REFERENCES users(id),
+        amount DECIMAL(10,2) NOT NULL,
+        payment_method VARCHAR(50),
+        transaction_id VARCHAR(100),
+        status VARCHAR(50),
+        payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Payment and invoice tables initialized');
+
     console.log('All database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -210,6 +237,7 @@ async function initDatabase() {
     const appointmentsRoutes = require('./appointments');
     const doctorSchedulingRoutes = require('./doctorScheduling');
     const adminRoutes = require('./adminRoutes');
+    const paymentRoutes = require('./paymentRoutes');
     const { authenticateToken, isAdmin } = require('./middleware/auth');
     
     // Use routers
@@ -219,6 +247,7 @@ async function initDatabase() {
     app.use('/api/notifications', notificationsRouter);
     app.use('/api/medical', medicalRoutes);
     app.use('/api/admin', authenticateToken, adminRoutes);
+    app.use('/api/payments', paymentRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {

@@ -88,7 +88,7 @@ router.put('/invoices/:id', authenticateToken, async (req, res) => {
     const { amount, dueDate, description, status } = req.body;
 
     // Validate status if provided
-    if (status && !['pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
+    if (status && !['pending', 'approved', 'paid', 'overdue', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
@@ -294,6 +294,126 @@ router.get('/invoices/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching invoice details:', error);
     res.status(500).json({ error: 'Failed to fetch invoice details' });
+  }
+});
+
+// Approve Invoice 
+router.put('/invoices/:id/approve', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the invoice first to check if it exists
+    const checkResult = await db.query(
+      'SELECT * FROM invoices WHERE id = $1',
+      [id]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    
+    // Update the invoice status to approved
+    const result = await db.query(
+      `UPDATE invoices 
+       SET status = 'approved', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+    
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INVOICE_APPROVED', 
+        `Invoice ID ${id} approved`, 
+        id
+      ]
+    );
+    
+    // Create notification for the patient
+    await db.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        result.rows[0].patient_id,
+        'INVOICE_APPROVED',
+        'Invoice Approved',
+        `Your invoice for $${result.rows[0].amount} has been approved and is ready for payment`,
+        id
+      ]
+    );
+    
+    res.json({ 
+      message: 'Invoice approved successfully',
+      invoice: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error approving invoice:', error);
+    res.status(500).json({ error: 'Failed to approve invoice' });
+  }
+});
+
+// Delete Invoice
+router.delete('/invoices/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the invoice first to check if it exists and retrieve patient info
+    const checkResult = await db.query(
+      'SELECT * FROM invoices WHERE id = $1',
+      [id]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    
+    // Check if the invoice has associated payments
+    const paymentsCheck = await db.query(
+      'SELECT COUNT(*) FROM payments WHERE invoice_id = $1',
+      [id]
+    );
+    
+    // If there are payments, don't allow deletion
+    if (parseInt(paymentsCheck.rows[0].count) > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete invoice with associated payments. Consider cancelling it instead.' 
+      });
+    }
+    
+    // Delete the invoice
+    await db.query('DELETE FROM invoices WHERE id = $1', [id]);
+    
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INVOICE_DELETED', 
+        `Invoice ID ${id} deleted`, 
+        null
+      ]
+    );
+    
+    // Create notification for the patient
+    await db.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        checkResult.rows[0].patient_id,
+        'INVOICE_DELETED',
+        'Invoice Cancelled',
+        `Your invoice for $${checkResult.rows[0].amount} has been cancelled`,
+        null
+      ]
+    );
+    
+    res.json({ message: 'Invoice deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    res.status(500).json({ error: 'Failed to delete invoice' });
   }
 });
 
