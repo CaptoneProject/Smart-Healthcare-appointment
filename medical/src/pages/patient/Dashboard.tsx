@@ -19,6 +19,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService, medicalService } from '../../services/api';
+import api from '../../services/api';
 import { formatDate, formatFullDate, formatTime } from '../../utils/dateTime';
 
 interface DashboardCardProps {
@@ -29,8 +30,6 @@ interface DashboardCardProps {
   link?: string;
 }
 
-
-// Add the missing interface
 interface DoctorAppointmentCardProps {
   doctor: string;
   specialty: string;
@@ -47,6 +46,7 @@ interface Appointment {
   time: string;
   status: string;
 }
+
 
 const DashboardCard: React.FC<DashboardCardProps> = ({ 
   icon: Icon, 
@@ -81,7 +81,6 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   </Card>
 );
 
-
 const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({ 
   doctor, 
   specialty, 
@@ -89,7 +88,6 @@ const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({
   time,
   status
 }) => {
-  // Remove the old formatDate function and use our utility
   return (
     <Card>
       <div className="flex justify-between items-start mb-4">
@@ -103,7 +101,7 @@ const DoctorAppointmentCard: React.FC<DoctorAppointmentCardProps> = ({
       <div className="pt-2 border-t border-white/10">
         <div className="flex items-center text-white/60">
           <Calendar className="w-4 h-4 mr-2" />
-          {formatDate(date)} {/* Use our formatDate utility */}
+          {formatDate(date)}
           <Clock className="w-4 h-4 ml-4 mr-2" />
           {time}
         </div>
@@ -135,6 +133,7 @@ const PatientDashboard: React.FC = () => {
         futureDate.setMonth(futureDate.getMonth() + 3);
         const endDate = futureDate.toISOString().split('T')[0];
         
+        // Fetch appointments
         const appointmentsData = await appointmentService.getAppointments({
           userId: user.id,
           userType: 'patient',
@@ -147,7 +146,7 @@ const PatientDashboard: React.FC = () => {
           id: appt.id,
           doctor: appt.doctor_name || 'Doctor',
           specialty: appt.specialty || appt.doctor_specialty || 'General Practice',
-          date: appt.date.split('T')[0], // Just take the date part without conversion
+          date: appt.date.split('T')[0],
           time: appt.time.substring(0, 5),
           status: appt.status
         }));
@@ -159,22 +158,37 @@ const PatientDashboard: React.FC = () => {
           (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
         );
         
-        // Add this new code to fetch medical records count
+        // Fetch medical records count
         let recentDocumentsCount = 0;
         try {
-          // Option 1: If your API supports counting records directly
           const medicalRecordsData = await medicalService.getOwnRecords();
           recentDocumentsCount = medicalRecordsData.length;
         } catch (error) {
           console.error('Error fetching medical records:', error);
         }
+
+        // Fetch pending payments amount
+        let pendingPaymentsAmount = 0;
+        try {
+          const response = await api.get(`/payments/invoices/patient/${user.id}`);
+          const invoices = response.data;
+          
+          pendingPaymentsAmount = invoices.reduce((total: number, invoice: any) => {
+            if (invoice.status.toLowerCase() !== 'paid') {
+              return total + parseFloat(String(invoice.remaining_amount || invoice.amount || 0));
+            }
+            return total;
+          }, 0);
+        } catch (error) {
+          console.error('Error fetching payment data:', error);
+        }
         
-        // Update stats with all values
+        // Update stats with all values including pending payments
         setStats({
           upcomingAppointments: confirmedAppointments.length,
-          activePrescriptions: 0, // You can add a similar call for prescriptions if needed
+          activePrescriptions: 0,
           recentDocuments: recentDocumentsCount,
-          pendingPayments: 0
+          pendingPayments: pendingPaymentsAmount
         });
 
       } catch (error) {
@@ -187,12 +201,10 @@ const PatientDashboard: React.FC = () => {
     fetchDashboardData();
   }, [user?.id]);
 
-  // Filter appointments for display in the appointments section
   const upcomingAppointments = appointments.filter(
     (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
   );
 
-  // Data for stats cards
   const dashboardStats = [
     {
       icon: Calendar,
@@ -218,7 +230,7 @@ const PatientDashboard: React.FC = () => {
     {
       icon: CreditCard,
       title: "Payment Due",
-      value: loading ? "..." : `$${stats.pendingPayments}`,
+      value: loading ? "..." : `$${stats.pendingPayments.toFixed(2)}`,
       footer: "View payments",
       link: "/p/payments"
     }
@@ -226,7 +238,6 @@ const PatientDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <PageHeader 
         title="Dashboard" 
         description="Your healthcare at a glance"
@@ -244,13 +255,11 @@ const PatientDashboard: React.FC = () => {
         }
       />
 
-      {/* Welcome Section */}
       <Card>
         <h2 className="text-xl font-semibold text-white/90">Welcome, {user?.name}</h2>
         <p className="text-white/60 mt-2">Here's an overview of your health management</p>
       </Card>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {dashboardStats.map((stat, index) => (
           <DashboardCard
@@ -264,7 +273,6 @@ const PatientDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Appointment Reminders */}
       {upcomingAppointments.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center mb-4">
@@ -297,7 +305,6 @@ const PatientDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Appointments Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white/90">Upcoming Appointments</h2>
@@ -323,7 +330,7 @@ const PatientDashboard: React.FC = () => {
                 key={appointment.id || index}
                 doctor={appointment.doctor}
                 specialty={appointment.specialty}
-                date={appointment.date} // Pass the date string directly
+                date={appointment.date}
                 time={appointment.time}
                 status={appointment.status}
               />

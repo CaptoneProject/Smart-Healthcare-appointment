@@ -18,6 +18,20 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 
+// Add some custom CSS for the animations
+const animationStyles = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .animate-pulse {
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .animation-delay-150 {
+    animation-delay: 150ms;
+  }
+`;
+
 // Define interfaces for the data structures
 interface Invoice {
   id: number;
@@ -111,6 +125,10 @@ const PatientPayments = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isViewDetailsOpen, setIsViewDetailsOpen] = useState<boolean>(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [processingInvoiceId, setProcessingInvoiceId] = useState<number | null>(null);
+  const [isPaymentSuccess, setIsPaymentSuccess] = useState<boolean>(false);
+  const [paidInvoice, setPaidInvoice] = useState<Invoice | null>(null);
   
   // Form states
   const [cardNumber, setCardNumber] = useState<string>('');
@@ -158,27 +176,50 @@ const PatientPayments = () => {
       
       // Ensure the remaining amount is a number
       const remainingAmount = parseFloat(String(invoice.remaining_amount || 0));
-      
-      // Format for display
       const formattedAmount = remainingAmount.toFixed(2);
       
-      // Ask for confirmation
-      if (!window.confirm(`Process payment of $${formattedAmount} using card ending in ${defaultMethod.last_four}?`)) {
-        return;
+      // Show confirmation dialog first
+      const confirmPayment = window.confirm(
+        `Process payment of $${formattedAmount} using card ending in ${defaultMethod.last_four}?`
+      );
+      
+      // Only proceed if user confirms
+      if (confirmPayment) {
+        // Set processing state
+        setProcessingInvoiceId(invoice.id);
+        setIsProcessingPayment(true);
+        
+        // Process the payment (with artificial delay for UI feedback)
+        setTimeout(async () => {
+          try {
+            await paymentService.processPayment({
+              invoiceId: invoice.id,
+              amount: remainingAmount,
+              paymentMethod: defaultMethod.id
+            });
+            
+            // Set a short delay before showing success modal
+            setTimeout(() => {
+              setIsProcessingPayment(false);
+              setPaidInvoice({...invoice, status: 'paid', remaining_amount: 0});
+              setIsPaymentSuccess(true);
+              
+              // Update local data
+              loadData(); // Refresh data
+            }, 500);
+          } catch (err) {
+            console.error("Payment error:", err);
+            toast.error("Failed to process payment. Please try again.");
+            setIsProcessingPayment(false);
+            setProcessingInvoiceId(null);
+          }
+        }, 1500); // Simulate processing time
       }
-      
-      // Process the payment
-      await paymentService.processPayment({
-        invoiceId: invoice.id,
-        amount: remainingAmount,
-        paymentMethod: defaultMethod.id
-      });
-      
-      toast.success("Payment processed successfully");
-      loadData(); // Refresh data
     } catch (err) {
-      console.error("Payment error:", err); // Add better error logging
+      console.error("Payment error:", err);
       toast.error("Failed to process payment. Please try again.");
+      setIsProcessingPayment(false);
+      setProcessingInvoiceId(null);
     }
   };
 
@@ -352,6 +393,9 @@ const PatientPayments = () => {
 
   return (
     <div className="space-y-6">
+      {/* Custom Animation Styles */}
+      <style>{animationStyles}</style>
+      
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -588,10 +632,24 @@ const PatientPayments = () => {
                 {invoice.status.toLowerCase() !== 'paid' && invoice.remaining_amount > 0 && (
                   <button 
                     onClick={() => handlePayNow(invoice)}
-                    className="flex items-center px-3 py-1.5 bg-blue-500 rounded-lg text-sm text-white hover:bg-blue-600 transition-colors"
+                    disabled={isProcessingPayment && processingInvoiceId === invoice.id}
+                    className={`flex items-center px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      isProcessingPayment && processingInvoiceId === invoice.id
+                        ? 'bg-blue-500/50 text-blue-200 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
                   >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Pay Now
+                    {isProcessingPayment && processingInvoiceId === invoice.id ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Pay Now
+                      </>
+                    )}
                   </button>
                 )}
                 
@@ -789,6 +847,102 @@ const PatientPayments = () => {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Processing Modal */}
+      {isProcessingPayment && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md mx-4 bg-slate-900 rounded-xl border border-white/10 p-6 flex flex-col items-center">
+            <div className="w-20 h-20 mb-4 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent animate-spin"></div>
+              <div className="absolute inset-2 rounded-full border-4 border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin animation-delay-150"></div>
+              <div className="absolute inset-4 flex items-center justify-center">
+                <CreditCard className="w-8 h-8 text-blue-400" />
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-medium mb-2">Processing Payment</h3>
+            <p className="text-gray-400 text-center mb-4">Please wait while we process your payment...</p>
+            
+            <div className="w-full bg-slate-800 rounded-full h-2 mb-4">
+              <div className="bg-blue-500 h-2 rounded-full animate-pulse"></div>
+            </div>
+            
+            <p className="text-sm text-gray-400">This will only take a moment</p>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Success Modal */}
+      {isPaymentSuccess && paidInvoice && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => {
+              setIsPaymentSuccess(false);
+              setPaidInvoice(null);
+            }} 
+          />
+          <div className="relative w-full max-w-md mx-4 bg-slate-900 rounded-xl border border-white/10 p-6 flex flex-col items-center">
+            <button 
+              onClick={() => {
+                setIsPaymentSuccess(false);
+                setPaidInvoice(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="w-20 h-20 mb-4 bg-green-500/20 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-green-400" />
+            </div>
+            
+            <h3 className="text-xl font-medium mb-2">Payment Successful!</h3>
+            <p className="text-gray-400 text-center mb-4">
+              Your payment of ${parseFloat(String(paidInvoice.amount || 0)).toFixed(2)} has been processed successfully.
+            </p>
+            
+            <div className="w-full bg-slate-800 p-4 rounded-lg mb-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">Amount:</span>
+                <span>${parseFloat(String(paidInvoice.amount || 0)).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">Invoice:</span>
+                <span>#{paidInvoice.id}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">Date:</span>
+                <span>{new Date().toLocaleDateString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Status:</span>
+                <span className="text-green-400">Paid</span>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleDownloadReceipt(paidInvoice)}
+                className="flex items-center px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition-colors"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Receipt
+              </button>
+              <button 
+                onClick={() => {
+                  setIsPaymentSuccess(false);
+                  setPaidInvoice(null);
+                }}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-slate-700 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
