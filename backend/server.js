@@ -214,6 +214,17 @@ async function initDatabase() {
         status VARCHAR(50),
         payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS payment_methods (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        card_number VARCHAR(255) NOT NULL,
+        last_four VARCHAR(4) NOT NULL,
+        expiry_date VARCHAR(10) NOT NULL,
+        cardholder_name VARCHAR(255) NOT NULL,
+        is_default BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     console.log('Payment and invoice tables initialized');
 
