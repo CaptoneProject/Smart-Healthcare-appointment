@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, FileText, MapPin } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { doctorService } from '../../services/api';
-import { formatTime, format, DATE_FORMATS,createLocalDate } from '../../utils/dateTime';
+import { formatTime, format, DATE_FORMATS, createLocalDate } from '../../utils/dateTime';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 export interface AppointmentFormData {
   doctorId: number;
@@ -18,7 +20,7 @@ interface AppointmentFormProps {
   onSubmit: (data: AppointmentFormData) => void;
   onCancel: () => void;
   initialData?: Partial<AppointmentFormData>;
-  hideReasonField?: boolean; // Add this prop
+  hideReasonField?: boolean;
 }
 
 interface Doctor {
@@ -27,7 +29,6 @@ interface Doctor {
   specialty: string;
 }
 
-// Add this interface for doctor schedule
 interface DoctorSchedule {
   day_of_week: number;
   start_time: string;
@@ -40,6 +41,7 @@ interface TimeSlot {
 }
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, initialData = {}, hideReasonField = false }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<AppointmentFormData>({
     doctorId: initialData.doctorId || 0,
     date: initialData.date || '',
@@ -54,8 +56,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof AppointmentFormData, string>>>({});
   const [availabilityMessage, setAvailabilityMessage] = useState<string>('');
-  
-  // Add state for doctor schedule
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([]);
   
   // Fetch doctors on component mount
@@ -75,7 +75,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     fetchDoctors();
   }, []);
   
-  // Update useEffect to fetch doctor schedule when doctor is selected
+  // Fetch doctor schedule when doctor is selected
   useEffect(() => {
     if (formData.doctorId) {
       const fetchDoctorSchedule = async () => {
@@ -172,6 +172,14 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
     return Object.keys(newErrors).length === 0;
   };
   
+  const getFeeForAppointment = () => {
+    const type = formData.type.toLowerCase();
+    if (type.includes('specialist')) return 100;
+    if (type.includes('urgent')) return 80;
+    if (type.includes('follow')) return 30;
+    return 50; // Default fee
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -179,23 +187,36 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
       return;
     }
     
-    const appointmentData = {
-      ...formData,
-      date: formData.date,
-      time: formData.time ? formatTime(formData.time) : '' // Add null check and use formatTime
-    };
+    try {
+      const appointmentData = {
+        ...formData,
+        date: formData.date,
+        time: formData.time ? formatTime(formData.time) : ''
+      };
 
-    onSubmit(appointmentData);
+      // Create the appointment
+      await onSubmit(appointmentData);
+      
+      // Ask about payment
+      const fee = getFeeForAppointment();
+      const shouldPay = window.confirm(`Your appointment has been scheduled successfully. The fee is $${fee}. Would you like to proceed to payment now?`);
+      
+      if (shouldPay) {
+        navigate('/p/payments');
+      }
+    } catch (error) {
+      console.error('Error scheduling appointment:', error);
+      toast.error('Failed to schedule appointment. Please try again.');
+    }
   };
 
-  // Add helper function to format date with day
+  // Format date with day
   const formatDateWithDay = (dateStr: string) => {
-    // Use our utility to create timezone-safe dates
     const date = createLocalDate(dateStr);
     return format(date, 'EEEE, ' + DATE_FORMATS.DISPLAY.DATE);
   };
 
-  // Update the generateAvailableDates function
+  // Generate available dates based on doctor schedule
   const generateAvailableDates = (): string[] => {
     if (!doctorSchedule || doctorSchedule.length === 0) return [];
     
@@ -312,7 +333,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
                   value={slot.time}
                   disabled={!slot.available}
                 >
-                  {formatTime(slot.time)} {/* Use formatTime here */}
+                  {formatTime(slot.time)}
                 </option>
               ))}
             </select>
