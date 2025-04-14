@@ -11,7 +11,6 @@ import {
   AlertCircle,
   FileText,
   Receipt,
-  ChevronDown,
   X,
   Star
 } from 'lucide-react';
@@ -19,39 +18,83 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 
+// Define interfaces for the data structures
+interface Invoice {
+  id: number;
+  patient_id: number;
+  appointment_id?: number;
+  amount: number;
+  remaining_amount: number;
+  status: string;
+  due_date: string;
+  description?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface PaymentMethod {
+  id: number;
+  user_id: number;
+  card_number: string;
+  last_four: string;
+  expiry_date: string;
+  cardholder_name: string;
+  is_default: boolean;
+  created_at?: string;
+}
+
+interface PaymentData {
+  invoiceId: number;
+  amount: number;
+  paymentMethod: number;
+}
+
+interface PaymentMethodData {
+  cardNumber: string;
+  expiryDate: string;
+  cvv: string;
+  cardholderName: string;
+}
+
+interface Stats {
+  dueThisMonth: number;
+  paidThisMonth: number;
+  pending: number;
+}
+
 // Simple payment service with API calls
 const paymentService = {
-  getPatientInvoices: async (patientId) => {
+  getPatientInvoices: async (patientId: number): Promise<Invoice[]> => {
     const response = await api.get(`/payments/invoices/patient/${patientId}`);
     return response.data;
   },
   
-  getInvoiceDetails: async (invoiceId) => {
+  getInvoiceDetails: async (invoiceId: number) => {
     const response = await api.get(`/payments/invoices/${invoiceId}`);
     return response.data;
   },
   
-  processPayment: async (data) => {
+  processPayment: async (data: PaymentData) => {
     const response = await api.post('/payments/payments', data);
     return response.data;
   },
 
-  getPaymentMethods: async () => {
+  getPaymentMethods: async (): Promise<PaymentMethod[]> => {
     const response = await api.get('/payments/payment-methods');
     return response.data;
   },
 
-  addPaymentMethod: async (data) => {
+  addPaymentMethod: async (data: PaymentMethodData) => {
     const response = await api.post('/payments/payment-methods', data);
     return response.data;
   },
 
-  deletePaymentMethod: async (id) => {
+  deletePaymentMethod: async (id: number) => {
     const response = await api.delete(`/payments/payment-methods/${id}`);
     return response.data;
   },
 
-  setDefaultPaymentMethod: async (id) => {
+  setDefaultPaymentMethod: async (id: number) => {
     const response = await api.put(`/payments/payment-methods/${id}/default`);
     return response.data;
   }
@@ -59,20 +102,22 @@ const paymentService = {
 
 const PatientPayments = () => {
   const { user } = useAuth();
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isAddPaymentMethodOpen, setIsAddPaymentMethodOpen] = useState(false);
-  const [invoices, setInvoices] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isAddPaymentMethodOpen, setIsAddPaymentMethodOpen] = useState<boolean>(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isViewDetailsOpen, setIsViewDetailsOpen] = useState<boolean>(false);
   
   // Form states
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [cardholderName, setCardholderName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardNumber, setCardNumber] = useState<string>('');
+  const [expiryDate, setExpiryDate] = useState<string>('');
+  const [cvv, setCvv] = useState<string>('');
+  const [cardholderName, setCardholderName] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -85,7 +130,7 @@ const PatientPayments = () => {
       setLoading(true);
       // Load invoices and payment methods in parallel
       const [invoicesData, methodsData] = await Promise.all([
-        paymentService.getPatientInvoices(user.id),
+        paymentService.getPatientInvoices(user?.id as number),
         paymentService.getPaymentMethods()
       ]);
       
@@ -100,7 +145,7 @@ const PatientPayments = () => {
     }
   };
 
-  const handlePayNow = async (invoice) => {
+  const handlePayNow = async (invoice: Invoice) => {
     try {
       // First check if there are any payment methods
       if (paymentMethods.length === 0) {
@@ -111,26 +156,33 @@ const PatientPayments = () => {
       // Use the default payment method
       const defaultMethod = paymentMethods.find(m => m.is_default) || paymentMethods[0];
       
+      // Ensure the remaining amount is a number
+      const remainingAmount = parseFloat(String(invoice.remaining_amount || 0));
+      
+      // Format for display
+      const formattedAmount = remainingAmount.toFixed(2);
+      
       // Ask for confirmation
-      if (!window.confirm(`Process payment of $${invoice.remaining_amount.toFixed(2)} using card ending in ${defaultMethod.last_four}?`)) {
+      if (!window.confirm(`Process payment of $${formattedAmount} using card ending in ${defaultMethod.last_four}?`)) {
         return;
       }
       
       // Process the payment
       await paymentService.processPayment({
         invoiceId: invoice.id,
-        amount: invoice.remaining_amount,
+        amount: remainingAmount,
         paymentMethod: defaultMethod.id
       });
       
       toast.success("Payment processed successfully");
       loadData(); // Refresh data
     } catch (err) {
+      console.error("Payment error:", err); // Add better error logging
       toast.error("Failed to process payment. Please try again.");
     }
   };
 
-  const handleAddPaymentMethod = async (e) => {
+  const handleAddPaymentMethod = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
@@ -166,7 +218,7 @@ const PatientPayments = () => {
     }
   };
 
-  const handleDeletePaymentMethod = async (id) => {
+  const handleDeletePaymentMethod = async (id: number) => {
     try {
       if (!window.confirm("Are you sure you want to delete this payment method?")) {
         return;
@@ -180,7 +232,7 @@ const PatientPayments = () => {
     }
   };
 
-  const handleSetDefault = async (id) => {
+  const handleSetDefault = async (id: number) => {
     try {
       await paymentService.setDefaultPaymentMethod(id);
       toast.success("Default payment method updated");
@@ -190,17 +242,79 @@ const PatientPayments = () => {
     }
   };
 
+  const handleViewDetails = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsViewDetailsOpen(true);
+  };
+
+  const handleDownloadReceipt = async (invoice: Invoice) => {
+    try {
+      // Show loading state
+      toast.info("Preparing your receipt...");
+      
+      // Create receipt data with invoice details
+      const receiptData = {
+        invoiceId: invoice.id,
+        description: invoice.description || 'Medical Service',
+        amount: parseFloat(String(invoice.amount || 0)),
+        date: new Date(invoice.created_at).toLocaleDateString(),
+        status: invoice.status,
+        patientId: invoice.patient_id
+      };
+      
+      // Generate a receipt PDF - normally you'd call your backend for this
+      // For now we'll create a simple text receipt as a blob
+      const receiptText = `
+        RECEIPT
+        -------
+        
+        Invoice #: ${receiptData.invoiceId}
+        Date: ${receiptData.date}
+        Description: ${receiptData.description}
+        Amount: $${receiptData.amount.toFixed(2)}
+        Status: ${receiptData.status}
+        
+        Thank you for your payment!
+        
+        Smart Healthcare System
+      `;
+      
+      // Create a blob from the receipt text
+      const blob = new Blob([receiptText], { type: 'text/plain' });
+      
+      // Create a download link and trigger it
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt-${invoice.id}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      toast.success("Receipt downloaded successfully");
+    } catch (err) {
+      console.error("Receipt download error:", err);
+      toast.error("Failed to download receipt");
+    }
+  };
+
   // Filter invoices based on active filter and search query
   const filteredInvoices = invoices.filter(invoice => {
-    if (activeFilter !== 'all' && invoice.status.toLowerCase() !== activeFilter) {
+    // Convert status to lowercase once to avoid repeated operations
+    const status = invoice.status?.toLowerCase() || '';
+    
+    if (activeFilter !== 'all' && status !== activeFilter) {
       return false;
     }
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
-        invoice.description?.toLowerCase().includes(query) ||
-        invoice.status?.toLowerCase().includes(query)
+        (invoice.description?.toLowerCase().includes(query) || false) ||
+        (status.includes(query))
       );
     }
     
@@ -208,7 +322,7 @@ const PatientPayments = () => {
   });
 
   // Calculate stats
-  const stats = {
+  const stats: Stats = {
     dueThisMonth: 0,
     paidThisMonth: 0,
     pending: 0
@@ -220,14 +334,19 @@ const PatientPayments = () => {
     
     if (dueDate.getMonth() === now.getMonth() && dueDate.getFullYear() === now.getFullYear()) {
       if (invoice.status.toLowerCase() !== 'paid') {
-        stats.dueThisMonth += invoice.remaining_amount || invoice.amount;
+        // Ensure we're adding a number
+        const amount = parseFloat(String(invoice.remaining_amount || invoice.amount || 0));
+        stats.dueThisMonth += amount;
       }
     }
     
     if (invoice.status.toLowerCase() === 'paid') {
-      stats.paidThisMonth += invoice.amount;
+      // Ensure we're adding a number
+      stats.paidThisMonth += parseFloat(String(invoice.amount || 0));
     } else if (invoice.status.toLowerCase() === 'pending') {
-      stats.pending += invoice.remaining_amount || invoice.amount;
+      // Ensure we're adding a number
+      const amount = parseFloat(String(invoice.remaining_amount || invoice.amount || 0));
+      stats.pending += amount;
     }
   });
 
@@ -264,7 +383,7 @@ const PatientPayments = () => {
             </div>
             <div>
               <p className="text-sm text-gray-400">Due This Month</p>
-              <p className="text-xl font-semibold">${stats.dueThisMonth.toFixed(2)}</p>
+              <p className="text-xl font-semibold">${(stats.dueThisMonth || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -276,7 +395,7 @@ const PatientPayments = () => {
             </div>
             <div>
               <p className="text-sm text-gray-400">Paid This Month</p>
-              <p className="text-xl font-semibold">${stats.paidThisMonth.toFixed(2)}</p>
+              <p className="text-xl font-semibold">${(stats.paidThisMonth || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -288,7 +407,7 @@ const PatientPayments = () => {
             </div>
             <div>
               <p className="text-sm text-gray-400">Pending</p>
-              <p className="text-xl font-semibold">${stats.pending.toFixed(2)}</p>
+              <p className="text-xl font-semibold">${(stats.pending || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -433,14 +552,14 @@ const PatientPayments = () => {
                       }`}>
                         {invoice.status}
                       </span>
-                      <span className="text-xl font-semibold">${invoice.amount?.toFixed(2)}</span>
+                      <span className="text-xl font-semibold">${parseFloat(String(invoice.amount || 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   {invoice.remaining_amount > 0 && (
                     <div className="text-sm text-gray-400">
-                      Remaining: ${invoice.remaining_amount.toFixed(2)}
+                      Remaining: ${parseFloat(String(invoice.remaining_amount || 0)).toFixed(2)}
                     </div>
                   )}
                 </div>
@@ -459,6 +578,7 @@ const PatientPayments = () => {
 
               <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                 <button 
+                  onClick={() => handleViewDetails(invoice)}
                   className="flex items-center px-3 py-1.5 bg-white/5 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
                 >
                   <FileText className="w-4 h-4 mr-2" />
@@ -476,7 +596,10 @@ const PatientPayments = () => {
                 )}
                 
                 {invoice.status.toLowerCase() === 'paid' && (
-                  <button className="flex items-center text-sm text-gray-400 hover:text-white">
+                  <button 
+                    onClick={() => handleDownloadReceipt(invoice)}
+                    className="flex items-center text-sm text-gray-400 hover:text-white"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Download Receipt
                   </button>
@@ -569,6 +692,104 @@ const PatientPayments = () => {
                 {isSubmitting ? 'Adding...' : 'Add Card'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Details Modal */}
+      {isViewDetailsOpen && selectedInvoice && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsViewDetailsOpen(false)} />
+          <div className="relative w-full max-w-md mx-4 bg-slate-900 rounded-xl border border-white/10 p-6">
+            <button 
+              onClick={() => setIsViewDetailsOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <h2 className="text-xl font-semibold mb-4">Invoice Details</h2>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className={`p-2 rounded-lg ${
+                  selectedInvoice.status.toLowerCase() === 'paid' ? 'bg-green-500/20 text-green-400' :
+                  selectedInvoice.status.toLowerCase() === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  <Receipt className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">{selectedInvoice.description || 'Medical Service'}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    selectedInvoice.status.toLowerCase() === 'paid' ? 'bg-green-500/20 text-green-400' :
+                    selectedInvoice.status.toLowerCase() === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
+                    'bg-red-500/20 text-red-400'
+                  }`}>
+                    {selectedInvoice.status}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-400">Invoice ID</p>
+                  <p className="text-sm">#{selectedInvoice.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Amount</p>
+                  <p className="text-sm font-medium">${parseFloat(String(selectedInvoice.amount || 0)).toFixed(2)}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-400">Invoice Date</p>
+                  <p className="text-sm">{new Date(selectedInvoice.created_at).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Due Date</p>
+                  <p className="text-sm">{new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
+                </div>
+                
+                {selectedInvoice.remaining_amount > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-400">Remaining Amount</p>
+                    <p className="text-sm font-medium">${parseFloat(String(selectedInvoice.remaining_amount || 0)).toFixed(2)}</p>
+                  </div>
+                )}
+                
+                {selectedInvoice.appointment_id && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-400">Linked Appointment</p>
+                    <p className="text-sm">Appointment #{selectedInvoice.appointment_id}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="pt-4 border-t border-white/10 flex justify-end">
+                {selectedInvoice.status.toLowerCase() !== 'paid' && selectedInvoice.remaining_amount > 0 && (
+                  <button 
+                    onClick={() => {
+                      setIsViewDetailsOpen(false);
+                      handlePayNow(selectedInvoice);
+                    }}
+                    className="flex items-center px-3 py-1.5 bg-blue-500 rounded-lg text-sm text-white hover:bg-blue-600 transition-colors"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Pay Now
+                  </button>
+                )}
+                
+                {selectedInvoice.status.toLowerCase() === 'paid' && (
+                  <button 
+                    onClick={() => handleDownloadReceipt(selectedInvoice)}
+                    className="flex items-center px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition-colors"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Receipt
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

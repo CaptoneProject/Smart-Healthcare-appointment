@@ -126,9 +126,9 @@ router.post('/', async (req, res) => {
         appointmentFee = 80;
       }
       
-      // Create due date (7 days from appointment date)
+      // Create due date (3 days before appointment date)
       const dueDate = new Date(normalizedDate);
-      dueDate.setDate(dueDate.getDate() + 7);
+      dueDate.setDate(dueDate.getDate() - 3);
       
       // Create invoice for the appointment
       const invoiceResult = await db.query(
