@@ -3,55 +3,8 @@ const router = express.Router();
 const moment = require('moment');
 const notifications = require('./notifications');
 const { sendAppointmentNotification } = notifications;
-const db = require('./database'); // This is the shared database configuration!
+const db = require('./database');
 const { normalizeDate, normalizeTime } = require('./utils/dateTime');
-
-// Initialize tables
-// const initTables = async () => {
-//   await db.query(`
-//     CREATE TABLE IF NOT EXISTS appointments (
-//       id SERIAL PRIMARY KEY,
-//       patient_id INTEGER REFERENCES users(id),
-//       doctor_id INTEGER REFERENCES users(id),
-
-//       time TIME NOT NULL,
-//       duration INTEGER NOT NULL, -- in minutes
-//       type VARCHAR(50),
-//       status VARCHAR(20) DEFAULT 'scheduled',
-//       notes TEXT,
-//       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//     );
-
-//     CREATE TABLE IF NOT EXISTS doctor_availability (
-//       id SERIAL PRIMARY KEY,
-//       doctor_id INTEGER REFERENCES users(id),
-//       day_of_week INTEGER, -- 0 = Sunday, 6 = Saturday
-//       start_time TIME,
-//       end_time TIME
-//     );
-//   `);
-  
-//   // Add column if it doesn't exist
-//   try {
-//     await db.query(`
-//       ALTER TABLE appointments 
-//       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//     `);
-//     await db.query(`
-//       ALTER TABLE appointments 
-//       ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0
-//     `);
-//     await db.query(`
-//       ALTER TABLE appointments 
-//       ADD COLUMN IF NOT EXISTS date DATE NOT NULL DEFAULT CURRENT_DATE;
-//     `);
-//   } catch (error) {
-//     console.error('Error adding updated_at column:', error);
-//   }
-// };
-
-// initTables();
 
 // Update checkAvailability function
 const checkAvailability = async (doctorId, date, time) => {
@@ -63,7 +16,7 @@ const checkAvailability = async (doctorId, date, time) => {
      WHERE doctor_id = $1 
      AND date = $2 
      AND time = $3
-     AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
+     AND status NOT IN ('rejected', 'cancelled')`,
     [doctorId, date, time]
   );
   
@@ -80,7 +33,7 @@ router.get('/', async (req, res) => {
       SELECT a.*, 
              p.name as patient_name, 
              d.name as doctor_name,
-             dc.specialization as specialty,  -- Use SQL comment style
+             dc.specialization as specialty,
              a.status as current_status,
              to_char(a.date, 'YYYY-MM-DD') as date
       FROM appointments a
@@ -109,20 +62,20 @@ router.get('/', async (req, res) => {
 
     query += ' ORDER BY a.date, a.time';
 
-    console.log('Final query:', query); // Debug log
-    console.log('Query params:', queryParams); // Debug log
+    console.log('Final query:', query);
+    console.log('Query params:', queryParams);
 
     const result = await db.query(query, queryParams);
     console.log(`Found ${result.rows.length} appointments`);
     res.json(result.rows);
 
   } catch (error) {
-    console.error('Error details:', error); // Add detailed error logging
+    console.error('Error details:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
-// POST /api/appointments
+// POST /api/appointments - UPDATED to create invoice
 router.post('/', async (req, res) => {
   try {
     const { patientId, doctorId, date, time, duration, type, notes } = req.body;
@@ -136,65 +89,134 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Time slot not available' });
     }
 
-    const result = await db.query(
-      `INSERT INTO appointments 
-       (patient_id, doctor_id, date, time, duration, type, notes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
-       RETURNING *`,
-      [patientId, doctorId, normalizedDate, normalizedTime, duration, type, notes]
-    );
+    // Start a transaction
+    await db.query('BEGIN');
 
-    // Add this after successful creation
-    await sendAppointmentNotification({
-      type: 'APPOINTMENT_SCHEDULED',
-      appointmentId: result.rows[0].id
-    });
+    try {
+      // Create the appointment
+      const appointmentResult = await db.query(
+        `INSERT INTO appointments 
+         (patient_id, doctor_id, date, time, duration, type, notes, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
+         RETURNING *`,
+        [patientId, doctorId, normalizedDate, normalizedTime, duration, type, notes]
+      );
 
-    // Add notification for both patient and doctor
-    await db.query(
-      `INSERT INTO notifications (user_id, type, title, message, related_id)
-       VALUES 
-       ($1, 'APPOINTMENT_CREATED', 'New Appointment', $2, $3),
-       ($4, 'APPOINTMENT_CREATED', 'New Appointment', $5, $3)`,
-      [
-        req.body.patient_id,
-        `Appointment scheduled with Dr. ${req.body.doctor_name} for ${req.body.date} at ${req.body.time}`,
-        result.rows[0].id,
-        req.body.doctor_id,
-        `New appointment with patient ${req.body.patient_name} for ${req.body.date} at ${req.body.time}`
-      ]
-    );
+      const appointment = appointmentResult.rows[0];
+      
+      // Get doctor information for invoice
+      const doctorResult = await db.query(
+        'SELECT name FROM users WHERE id = $1',
+        [doctorId]
+      );
+      
+      // Get patient information
+      const patientResult = await db.query(
+        'SELECT name FROM users WHERE id = $1',
+        [patientId]
+      );
+      
+      // Set fee based on appointment type
+      let appointmentFee = 50; // Default consultation fee
+      if (type.toLowerCase().includes('specialist')) {
+        appointmentFee = 100;
+      } else if (type.toLowerCase().includes('follow')) {
+        appointmentFee = 30;
+      } else if (type.toLowerCase().includes('urgent')) {
+        appointmentFee = 80;
+      }
+      
+      // Create due date (7 days from appointment date)
+      const dueDate = new Date(normalizedDate);
+      dueDate.setDate(dueDate.getDate() + 7);
+      
+      // Create invoice for the appointment
+      const invoiceResult = await db.query(
+        `INSERT INTO invoices 
+         (patient_id, appointment_id, amount, status, due_date, description)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          patientId, 
+          appointment.id, 
+          appointmentFee, 
+          'pending', 
+          dueDate.toISOString().split('T')[0],
+          `Appointment with Dr. ${doctorResult.rows[0].name} on ${normalizedDate} at ${normalizedTime}`
+        ]
+      );
+      
+      const invoice = invoiceResult.rows[0];
 
-    // After creating a new appointment
-    const appointmentDetails = await db.query(
-      `SELECT a.*, p.name as patient_name, d.name as doctor_name
-       FROM appointments a
-       JOIN users p ON a.patient_id = p.id
-       JOIN users d ON a.doctor_id = d.id
-       WHERE a.id = $1`,
-      [result.rows[0].id]
-    );
+      // Add notification for both patient and doctor
+      await db.query(
+        `INSERT INTO notifications (user_id, type, title, message, related_id)
+         VALUES 
+         ($1, 'APPOINTMENT_CREATED', 'New Appointment', $2, $3),
+         ($4, 'APPOINTMENT_CREATED', 'New Appointment', $5, $3)`,
+        [
+          patientId,
+          `Appointment scheduled with Dr. ${doctorResult.rows[0].name} for ${normalizedDate} at ${normalizedTime}`,
+          appointment.id,
+          doctorId,
+          `New appointment with patient ${patientResult.rows[0].name} for ${normalizedDate} at ${normalizedTime}`
+        ]
+      );
 
-    const appt = appointmentDetails.rows[0];
+      // Add invoice notification for patient
+      await db.query(
+        `INSERT INTO notifications (user_id, type, title, message, related_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          patientId,
+          'INVOICE_CREATED',
+          'New Invoice',
+          `Invoice created for your appointment with Dr. ${doctorResult.rows[0].name}. Amount: $${appointmentFee.toFixed(2)}`,
+          invoice.id
+        ]
+      );
 
-    // Format the date properly
-    const formattedDate = appt.date ? new Date(appt.date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }) : 'unknown date';
+      // Add to system activities
+      await db.query(
+        `INSERT INTO system_activities (type, message, related_id) 
+         VALUES ($1, $2, $3)`,
+        [
+          'APPOINTMENT_CREATED', 
+          `New appointment scheduled: ${patientResult.rows[0].name} with Dr. ${doctorResult.rows[0].name} on ${normalizedDate}`, 
+          appointment.id
+        ]
+      );
 
-    await db.query(
-      `INSERT INTO system_activities (type, message, related_id) 
-       VALUES ($1, $2, $3)`,
-      [
-        'APPOINTMENT_CREATED', 
-        `New appointment scheduled: ${appt.patient_name} with Dr. ${appt.doctor_name} on ${formattedDate}`, 
-        result.rows[0].id
-      ]
-    );
+      // Add another activity for invoice
+      await db.query(
+        `INSERT INTO system_activities (type, message, related_id) 
+         VALUES ($1, $2, $3)`,
+        [
+          'INVOICE_CREATED', 
+          `Invoice created for appointment #${appointment.id}, amount: $${appointmentFee.toFixed(2)}`, 
+          invoice.id
+        ]
+      );
 
-    res.status(201).json(result.rows[0]);
+      // Send appointment notification
+      await sendAppointmentNotification({
+        type: 'APPOINTMENT_SCHEDULED',
+        appointmentId: appointment.id
+      });
+
+      // Commit the transaction
+      await db.query('COMMIT');
+
+      // Return appointment with invoice details
+      res.status(201).json({
+        appointment: appointment,
+        invoice: invoice
+      });
+    } catch (err) {
+      // Rollback on error
+      await db.query('ROLLBACK');
+      throw err;
+    }
   } catch (error) {
     console.error('Error creating appointment:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -376,12 +398,12 @@ router.get('/available-slots', async (req, res) => {
        FROM appointments 
        WHERE doctor_id = $1 
        AND date = $2 
-       AND status NOT IN ('rejected', 'cancelled')`, // Modified this line to exclude rejected and cancelled
+       AND status NOT IN ('rejected', 'cancelled')`,
       [doctorId, date]
     );
 
-    console.log('Checking slots for date:', date); // Add for debugging
-    console.log('Booked slots:', bookedSlots.rows); // Add for debugging
+    console.log('Checking slots for date:', date);
+    console.log('Booked slots:', bookedSlots.rows);
 
     // Rest of your available slots logic...
   } catch (error) {
@@ -506,6 +528,29 @@ router.put('/:id/reschedule', async (req, res) => {
   } catch (error) {
     console.error('Error rescheduling appointment:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get invoice for appointment
+router.get('/:id/invoice', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const invoiceResult = await db.query(
+      `SELECT i.* 
+       FROM invoices i
+       WHERE i.appointment_id = $1`,
+      [id]
+    );
+    
+    if (invoiceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No invoice found for this appointment' });
+    }
+    
+    res.json(invoiceResult.rows[0]);
+  } catch (error) {
+    console.error('Error fetching invoice for appointment:', error);
+    res.status(500).json({ error: 'Failed to fetch invoice' });
   }
 });
 
