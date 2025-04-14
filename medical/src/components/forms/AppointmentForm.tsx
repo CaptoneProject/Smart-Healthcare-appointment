@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, FileText, MapPin } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { doctorService } from '../../services/api';
-import { formatTime, format, DATE_FORMATS,createLocalDate } from '../../utils/dateTime';
+import { formatTime, format, DATE_FORMATS, createLocalDate } from '../../utils/dateTime';
 
 export interface AppointmentFormData {
   doctorId: number;
@@ -38,6 +38,15 @@ interface TimeSlot {
   time: string;
   available: boolean;
 }
+
+// Add this near the top of your component
+const appointmentFees = {
+  "Consultation": 50,
+  "Follow-up": 30,
+  "Check-up": 50,
+  "Urgent": 80,
+  "Specialist": 100
+};
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, initialData = {}, hideReasonField = false }) => {
   const [formData, setFormData] = useState<AppointmentFormData>({
@@ -338,11 +347,14 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit, onCancel, i
                 rounded-lg py-2 pl-10 pr-4 appearance-none focus:outline-none focus:border-blue-500 
                 transition-colors text-white`}
             >
-              <option value="Consultation">General Consultation</option>
-              <option value="Follow-up">Follow-up Visit</option>
-              <option value="Check-up">Routine Check-up</option>
-              <option value="Urgent">Urgent Care</option>
-              <option value="Specialist">Specialist Consultation</option>
+              {Object.entries(appointmentFees).map(([type, fee]) => (
+                <option key={type} value={type}>
+                  {type === "Check-up" ? "Routine Check-up" : 
+                    type === "Consultation" ? "General Consultation" : 
+                    `${type} ${type === "Specialist" ? "Consultation" : 
+                    type === "Urgent" ? "Care" : "Visit"}`} (${fee})
+                </option>
+              ))}
             </select>
           </div>
           {errors.type && <p className="text-red-400 text-sm mt-1">{errors.type}</p>}

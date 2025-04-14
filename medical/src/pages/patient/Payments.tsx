@@ -129,6 +129,8 @@ const PatientPayments = () => {
   const [processingInvoiceId, setProcessingInvoiceId] = useState<number | null>(null);
   const [isPaymentSuccess, setIsPaymentSuccess] = useState<boolean>(false);
   const [paidInvoice, setPaidInvoice] = useState<Invoice | null>(null);
+  const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState<boolean>(false);
+  const [invoiceToPayNow, setInvoiceToPayNow] = useState<Invoice | null>(null);
   
   // Form states
   const [cardNumber, setCardNumber] = useState<string>('');
@@ -163,7 +165,7 @@ const PatientPayments = () => {
     }
   };
 
-  const handlePayNow = async (invoice: Invoice) => {
+  const handlePayNow = (invoice: Invoice) => {
     try {
       // First check if there are any payment methods
       if (paymentMethods.length === 0) {
@@ -176,50 +178,62 @@ const PatientPayments = () => {
       
       // Ensure the remaining amount is a number
       const remainingAmount = parseFloat(String(invoice.remaining_amount || 0));
-      const formattedAmount = remainingAmount.toFixed(2);
       
-      // Show confirmation dialog first
-      const confirmPayment = window.confirm(
-        `Process payment of $${formattedAmount} using card ending in ${defaultMethod.last_four}?`
-      );
+      // Instead of window.confirm, set the states for the modal
+      setInvoiceToPayNow(invoice);
+      setIsPaymentConfirmOpen(true);
+    } catch (err) {
+      console.error("Payment error:", err);
+      toast.error("Failed to process payment. Please try again.");
+    }
+  };
+
+  const confirmPayment = async () => {
+    if (!invoiceToPayNow) return;
+    
+    try {
+      const defaultMethod = paymentMethods.find(m => m.is_default) || paymentMethods[0];
+      const remainingAmount = parseFloat(String(invoiceToPayNow.remaining_amount || 0));
       
-      // Only proceed if user confirms
-      if (confirmPayment) {
-        // Set processing state
-        setProcessingInvoiceId(invoice.id);
-        setIsProcessingPayment(true);
-        
-        // Process the payment (with artificial delay for UI feedback)
-        setTimeout(async () => {
-          try {
-            await paymentService.processPayment({
-              invoiceId: invoice.id,
-              amount: remainingAmount,
-              paymentMethod: defaultMethod.id
-            });
-            
-            // Set a short delay before showing success modal
-            setTimeout(() => {
-              setIsProcessingPayment(false);
-              setPaidInvoice({...invoice, status: 'paid', remaining_amount: 0});
-              setIsPaymentSuccess(true);
-              
-              // Update local data
-              loadData(); // Refresh data
-            }, 500);
-          } catch (err) {
-            console.error("Payment error:", err);
-            toast.error("Failed to process payment. Please try again.");
+      // Close the confirmation modal
+      setIsPaymentConfirmOpen(false);
+      
+      // Set processing state
+      setProcessingInvoiceId(invoiceToPayNow.id);
+      setIsProcessingPayment(true);
+      
+      // Process the payment (with artificial delay for UI feedback)
+      setTimeout(async () => {
+        try {
+          await paymentService.processPayment({
+            invoiceId: invoiceToPayNow.id,
+            amount: remainingAmount,
+            paymentMethod: defaultMethod.id
+          });
+          
+          // Set a short delay before showing success modal
+          setTimeout(() => {
             setIsProcessingPayment(false);
-            setProcessingInvoiceId(null);
-          }
-        }, 1500); // Simulate processing time
-      }
+            setPaidInvoice({...invoiceToPayNow, status: 'paid', remaining_amount: 0});
+            setIsPaymentSuccess(true);
+            
+            // Update local data
+            loadData(); // Refresh data
+          }, 500);
+        } catch (err) {
+          console.error("Payment error:", err);
+          toast.error("Failed to process payment. Please try again.");
+          setIsProcessingPayment(false);
+          setProcessingInvoiceId(null);
+        }
+      }, 1500); // Simulate processing time
     } catch (err) {
       console.error("Payment error:", err);
       toast.error("Failed to process payment. Please try again.");
       setIsProcessingPayment(false);
       setProcessingInvoiceId(null);
+    } finally {
+      setInvoiceToPayNow(null);
     }
   };
 
@@ -275,11 +289,23 @@ const PatientPayments = () => {
 
   const handleSetDefault = async (id: number) => {
     try {
+      // First update the UI immediately without waiting for the API
+      setPaymentMethods(currentMethods => 
+        currentMethods.map(method => ({
+          ...method,
+          is_default: method.id === id
+        }))
+      );
+      
+      // Then update in the background
       await paymentService.setDefaultPaymentMethod(id);
+      
+      // No need to reload data - we've already updated the UI
       toast.success("Default payment method updated");
-      loadData(); // Refresh data
     } catch (err) {
+      // If there's an error, reload from the server to ensure consistency
       toast.error("Failed to update default payment method");
+      loadData();
     }
   };
 
@@ -846,6 +872,52 @@ const PatientPayments = () => {
                     Download Receipt
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Confirmation Modal */}
+      {isPaymentConfirmOpen && invoiceToPayNow && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsPaymentConfirmOpen(false)} />
+          <div className="relative w-full max-w-md mx-4 bg-slate-900 rounded-xl border border-white/10 p-6">
+            <button 
+              onClick={() => setIsPaymentConfirmOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <h2 className="text-xl font-semibold mb-4">Confirm Payment</h2>
+            
+            <div className="space-y-4">
+              <div className="flex items-start p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <CreditCard className="w-5 h-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+                <div>
+                  <p className="text-white/90 mb-1">
+                    Process payment of ${parseFloat(String(invoiceToPayNow.remaining_amount || 0)).toFixed(2)} using card ending in {(paymentMethods.find(m => m.is_default) || paymentMethods[0]).last_four}?
+                  </p>
+                  <p className="text-sm text-white/70">
+                    {invoiceToPayNow.description || 'Medical Service'} 
+                  </p>
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-white/10 flex justify-end space-x-3">
+                <button 
+                  className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm font-medium hover:bg-white/20"
+                  onClick={() => setIsPaymentConfirmOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
+                  onClick={confirmPayment}
+                >
+                  Confirm Payment
+                </button>
               </div>
             </div>
           </div>
