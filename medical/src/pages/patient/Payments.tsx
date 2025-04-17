@@ -173,12 +173,6 @@ const PatientPayments = () => {
         return toast.info("Please add a payment method first");
       }
       
-      // Use the default payment method
-      const defaultMethod = paymentMethods.find(m => m.is_default) || paymentMethods[0];
-      
-      // Ensure the remaining amount is a number
-      const remainingAmount = parseFloat(String(invoice.remaining_amount || 0));
-      
       // Instead of window.confirm, set the states for the modal
       setInvoiceToPayNow(invoice);
       setIsPaymentConfirmOpen(true);

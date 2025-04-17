@@ -554,4 +554,67 @@ router.get('/:id/invoice', async (req, res) => {
   }
 });
 
+// Get confirmed appointments with pending payments for a patient
+router.get('/patient/:patientId/confirmed-unpaid', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    
+    // Ensure the requesting user is accessing their own data
+    if (req.user && (req.user.id !== parseInt(patientId) && req.user.userType !== 'admin')) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    // Query appointments that are confirmed but have a pending invoice
+    // Calculate remaining_amount using payments table
+    const result = await db.query(`
+      SELECT a.id, a.date, a.time, a.status, 
+             u.name as doctor_name,
+             i.id as invoice_id, i.amount, 
+             (i.amount - COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)) as remaining_amount,
+             i.status as invoice_status
+      FROM appointments a
+      JOIN users u ON a.doctor_id = u.id
+      JOIN invoices i ON a.id = i.appointment_id
+      WHERE a.patient_id = $1 
+      AND a.status = 'confirmed' 
+      AND i.status = 'pending'
+      ORDER BY a.date ASC, a.time ASC
+    `, [patientId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error getting confirmed unpaid appointments:', error);
+    res.status(500).json({ error: 'Failed to get appointments' });
+  }
+});
+
+// Add this route to get a single appointment by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(`
+      SELECT a.*, 
+             p.name as patient_name, 
+             d.name as doctor_name,
+             dc.specialization as specialty,
+             to_char(a.date, 'YYYY-MM-DD') as date
+      FROM appointments a
+      JOIN users p ON a.patient_id = p.id
+      JOIN users d ON a.doctor_id = d.id
+      LEFT JOIN doctor_credentials dc ON dc.doctor_id = a.doctor_id
+      WHERE a.id = $1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error getting appointment by ID:', error);
+    res.status(500).json({ error: 'Failed to get appointment' });
+  }
+});
+
 module.exports = router;

@@ -5,7 +5,9 @@ import {
   Clock, 
   MapPin, 
   Plus,
-  FileText
+  FileText,
+  X,
+  CheckCircle
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -233,6 +235,7 @@ const PatientAppointments: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState<boolean>(false);
   const [appointmentToReschedule, setAppointmentToReschedule] = useState<Appointment | null>(null);
+  const [isBookingSuccessOpen, setIsBookingSuccessOpen] = useState<boolean>(false); // New state variable
 
   useEffect(() => {
     // Only fetch if user is logged in
@@ -393,6 +396,10 @@ const PatientAppointments: React.FC = () => {
       
       await appointmentService.createAppointment(appointmentData);
       setIsNewAppointmentOpen(false);
+      
+      // Show confirmation and payment information
+      setIsBookingSuccessOpen(true); // New state variable
+      
       fetchAppointments();
     } catch (err) {
       setError('Failed to schedule appointment. Please try again.');
@@ -594,6 +601,39 @@ const PatientAppointments: React.FC = () => {
           />
         )}
       </Modal>
+
+      {/* Booking Success Modal */}
+      {isBookingSuccessOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsBookingSuccessOpen(false)} />
+          <div className="relative w-full max-w-md mx-4 bg-slate-900 rounded-xl border border-white/10 p-6">
+            <button 
+              onClick={() => setIsBookingSuccessOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-green-400" />
+              </div>
+              
+              <h2 className="text-xl font-semibold mb-2">Appointment Scheduled!</h2>
+              <p className="text-gray-400 mb-4">
+                Your appointment has been scheduled successfully. You will be able to make a payment after the doctor confirms your appointment.
+              </p>
+              
+              <button 
+                onClick={() => setIsBookingSuccessOpen(false)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { appointmentService, medicalService } from '../../services/api';
 import api from '../../services/api';
 import { formatDate, formatFullDate, formatTime } from '../../utils/dateTime';
+import PaymentReminder from '../../components/PaymentReminder'; // Import the component
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -47,6 +48,17 @@ interface Appointment {
   status: string;
 }
 
+// Update the existing PendingPaymentAppointment interface
+interface PendingPaymentAppointment {
+  id: number;
+  doctor_name: string;
+  date: string;
+  time: string;
+  amount: number;
+  remaining_amount: number; // Add this property
+  invoice_id: number;
+  invoice_status?: string;
+}
 
 const DashboardCard: React.FC<DashboardCardProps> = ({ 
   icon: Icon, 
@@ -115,6 +127,7 @@ const PatientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pendingPaymentAppointments, setPendingPaymentAppointments] = useState<PendingPaymentAppointment[]>([]);
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     activePrescriptions: 0,
@@ -167,18 +180,53 @@ const PatientDashboard: React.FC = () => {
           console.error('Error fetching medical records:', error);
         }
 
-        // Fetch pending payments amount
+        // Fetch pending payments amount and appointments with pending payments
         let pendingPaymentsAmount = 0;
         try {
           const response = await api.get(`/payments/invoices/patient/${user.id}`);
           const invoices = response.data;
           
+          // Calculate total pending amount
           pendingPaymentsAmount = invoices.reduce((total: number, invoice: any) => {
             if (invoice.status.toLowerCase() !== 'paid') {
               return total + parseFloat(String(invoice.remaining_amount || invoice.amount || 0));
             }
             return total;
           }, 0);
+          
+          // Get pending payment appointments
+          const pendingInvoices = invoices.filter((invoice: any) => 
+            invoice.status.toLowerCase() === 'pending' && 
+            invoice.appointment_id !== null
+          );
+          
+          // If there are pending invoices with appointment IDs, fetch appointment details
+          if (pendingInvoices.length > 0) {
+            // Get appointment details for pending invoices
+            const pendingPayments = await Promise.all(
+              pendingInvoices.map(async (invoice: any) => {
+                try {
+                  const appointmentResponse = await api.get(`/appointments/${invoice.appointment_id}`);
+                  const appointment = appointmentResponse.data;
+                  
+                  return {
+                    id: appointment.id,
+                    doctor_name: appointment.doctor_name,
+                    date: appointment.date.split('T')[0],
+                    time: appointment.time.substring(0, 5),
+                    amount: parseFloat(String(invoice.remaining_amount || invoice.amount || 0)),
+                    invoice_id: invoice.id
+                  };
+                } catch (err) {
+                  console.error(`Error fetching appointment ${invoice.appointment_id}:`, err);
+                  return null;
+                }
+              })
+            );
+            
+            // Filter out any null results and set to state
+            setPendingPaymentAppointments(pendingPayments.filter(Boolean));
+          }
         } catch (error) {
           console.error('Error fetching payment data:', error);
         }
@@ -199,6 +247,40 @@ const PatientDashboard: React.FC = () => {
     };
     
     fetchDashboardData();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const fetchPendingPayments = async () => {
+      if (!user?.id) return;
+      try {
+        // Get pending invoices with appointment information already included
+        const pendingPayments = await appointmentService.getConfirmedUnpaidAppointments(user.id);
+        
+        // If we have pending payments, set them directly (no need for additional fetches)
+        if (pendingPayments && pendingPayments.length > 0) {
+          // Format dates and times as needed and ensure all required properties exist
+          const formattedPayments = pendingPayments.map(payment => ({
+            id: payment.id,
+            doctor_name: payment.doctor_name,
+            date: payment.date.split('T')[0], // Ensure date is properly formatted
+            time: payment.time.substring(0, 5), // Ensure time is properly formatted
+            amount: parseFloat(String(payment.amount || 0)),
+            remaining_amount: parseFloat(String(payment.remaining_amount || payment.amount || 0)),
+            invoice_id: payment.invoice_id,
+            invoice_status: payment.invoice_status
+          }));
+          
+          setPendingPaymentAppointments(formattedPayments);
+        } else {
+          setPendingPaymentAppointments([]);
+        }
+      } catch (error) {
+        console.error('Error fetching pending payment appointments:', error);
+        setPendingPaymentAppointments([]);
+      }
+    };
+    
+    fetchPendingPayments();
   }, [user?.id]);
 
   const upcomingAppointments = appointments.filter(
@@ -259,6 +341,30 @@ const PatientDashboard: React.FC = () => {
         <h2 className="text-xl font-semibold text-white/90">Welcome, {user?.name}</h2>
         <p className="text-white/60 mt-2">Here's an overview of your health management</p>
       </Card>
+
+      {/* Payment Reminders Section */}
+      {pendingPaymentAppointments.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center mb-4">
+            <CreditCard className="w-5 h-5 text-blue-400 mr-2" />
+            <h2 className="text-xl font-semibold text-white/90">Payment Reminders</h2>
+          </div>
+          <div className="space-y-4">
+            {pendingPaymentAppointments.map(appointment => (
+              <PaymentReminder
+                key={appointment.id}
+                appointmentId={appointment.id}
+                doctorName={appointment.doctor_name}
+                appointmentDate={appointment.date}
+                appointmentTime={appointment.time}
+                // Use amount if remaining_amount is not available
+                amount={appointment.remaining_amount || appointment.amount}
+                invoiceId={appointment.invoice_id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {dashboardStats.map((stat, index) => (

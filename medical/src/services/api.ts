@@ -264,8 +264,32 @@ export const appointmentService = {
       console.error('Error rescheduling appointment:', error);
       throw error;
     }
+  },
+
+  // Get confirmed appointments with pending payments
+  getConfirmedUnpaidAppointments: async (patientId: number): Promise<PendingPaymentAppointment[]> => {
+    try {
+      const response = await api.get(`/appointments/patient/${patientId}/confirmed-unpaid`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching confirmed unpaid appointments:', error);
+      throw error;
+    }
   }
 };
+
+// Add this interface near your other interfaces
+export interface PendingPaymentAppointment {
+  id: number;
+  date: string;
+  time: string;
+  status: string;
+  doctor_name: string;
+  invoice_id: number;
+  amount: number;
+  remaining_amount: number;
+  invoice_status: string;
+}
 
 // Doctor scheduling services
 export const doctorService = {
