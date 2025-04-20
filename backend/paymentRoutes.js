@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('./database');
 const { authenticateToken, requireRole } = require('./middleware/auth');
+const { sendAppointmentNotification, sendPaymentNotification, createNotification } = require('./notifications');
 
 // Initialize tables if they don't exist
 const initTables = async () => {
@@ -67,6 +68,28 @@ router.post('/invoices', authenticateToken, requireRole(['admin', 'doctor']), as
        VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
       [patient_id, appointment_id, amount, due_date, description]
     );
+
+    // Get patient and doctor names
+    const userInfo = await db.query(
+      'SELECT p.name as patient_name, d.name as doctor_name, d.id as doctor_id FROM users p, users d WHERE p.id = $1 AND d.id = $2',
+      [patient_id, req.user.userId]
+    );
+
+    // Send notification to patient about the new invoice
+    if (userInfo.rows.length > 0) {
+      await sendPaymentNotification({
+        userId: patient_id,
+        type: 'INVOICE_CREATED',
+        title: 'New Invoice Created',
+        message: `A new invoice for $${amount} has been created by Dr. ${userInfo.rows[0].doctor_name}.`,
+        relatedId: result.rows[0].id,
+        invoiceId: result.rows[0].id,
+        amount: amount,
+        patientName: userInfo.rows[0].patient_name,
+        doctorName: userInfo.rows[0].doctor_name
+      });
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create invoice' });
@@ -126,6 +149,34 @@ router.put('/invoices/:id/approve', authenticateToken, requireRole(['admin', 'do
       `UPDATE invoices SET status='approved' WHERE id=$1 RETURNING *`,
       [req.params.id]
     );
+
+    // Get invoice details
+    const invoiceInfo = await db.query(
+      'SELECT i.*, p.name as patient_name FROM invoices i JOIN users p ON i.patient_id = p.id WHERE i.id = $1',
+      [req.params.id]
+    );
+
+    if (invoiceInfo.rows.length > 0) {
+      const invoice = invoiceInfo.rows[0];
+      
+      // Get doctor name
+      const doctorInfo = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
+      const doctorName = doctorInfo.rows[0]?.name || 'your healthcare provider';
+      
+      // Send notification to patient
+      await sendPaymentNotification({
+        userId: invoice.patient_id,
+        type: 'INVOICE_APPROVED',
+        title: 'Invoice Ready for Payment',
+        message: `Your invoice for $${invoice.amount} is now approved and ready for payment.`,
+        relatedId: invoice.id,
+        invoiceId: invoice.id,
+        amount: invoice.amount,
+        patientName: invoice.patient_name,
+        doctorName: doctorName
+      });
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: 'Failed to approve invoice' });
@@ -239,16 +290,99 @@ router.post('/payments', authenticateToken, async (req, res) => {
       );
     }
 
-    // Log the activity
-    await db.query(
-      `INSERT INTO system_activities (type, message, related_id) 
-       VALUES ($1, $2, $3)`,
-      [
-        'PAYMENT_PROCESSED', 
-        `Payment of $${amount} processed for invoice ID: ${invoiceId}`, 
-        paymentResult.rows[0].id
-      ]
+    // Add notification for the payment
+    const patientName = await db.query('SELECT name FROM users WHERE id = $1', [invoice.patient_id]);
+    const doctorInfo = await db.query(
+      'SELECT u.name, u.id FROM appointments a JOIN users u ON a.doctor_id = u.id WHERE a.id = $1',
+      [invoice.appointment_id]
     );
+
+    let doctorId = null;
+    let doctorName = "your healthcare provider";
+
+    if (doctorInfo.rows.length > 0) {
+      doctorId = doctorInfo.rows[0].id;
+      doctorName = doctorInfo.rows[0].name;
+    }
+
+    // Send payment notification to patient
+    await sendPaymentNotification({
+      userId: invoice.patient_id,
+      type: 'PAYMENT_PROCESSED',
+      title: 'Payment Processed',
+      message: `Your payment of $${amount} for invoice #${invoiceId} has been processed successfully.`,
+      relatedId: paymentResult.rows[0].id,
+      amount: amount,
+      invoiceId: invoiceId,
+      patientName: patientName.rows[0]?.name || 'Patient',
+      doctorName: doctorName,
+      remainingAmount: invoice.amount - totalPaid,
+      isPaid: totalPaid >= invoice.amount
+    });
+
+    // If there's a doctor associated, notify them too
+    if (doctorId) {
+      await sendPaymentNotification({
+        userId: doctorId,
+        type: 'PAYMENT_RECEIVED',
+        title: 'Payment Received',
+        message: `Payment of $${amount} received from ${patientName.rows[0]?.name || 'Patient'} for invoice #${invoiceId}.`,
+        relatedId: paymentResult.rows[0].id,
+        amount: amount,
+        invoiceId: invoiceId,
+        patientName: patientName.rows[0]?.name || 'Patient',
+        doctorName: doctorName,
+        remainingAmount: invoice.amount - totalPaid,
+        isPaid: totalPaid >= invoice.amount
+      });
+    }
+
+    // If the invoice is now fully paid, send special notifications
+    if (totalPaid >= invoice.amount) {
+      // Update the invoice status to 'paid'
+      await db.query('UPDATE invoices SET status = $1 WHERE id = $2', ['paid', invoiceId]);
+
+      // Create a single system activity for the paid invoice
+      const activityMessage = `Invoice #${invoiceId} for ${patientName.rows[0]?.name || 'Patient'} has been paid in full`;
+      
+      await db.query(
+        `INSERT INTO system_activities (type, message, related_id) 
+         VALUES ($1, $2, $3)`,
+        ['INVOICE_PAID', activityMessage, invoiceId]
+      );
+
+      // Send "invoice paid" notification to patient (without creating a second system activity)
+      await db.query(
+        `INSERT INTO notifications 
+         (user_id, type, title, message, related_id, is_read, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+        [
+          invoice.patient_id,
+          'INVOICE_PAID',
+          'Invoice Paid in Full',
+          `Your invoice #${invoiceId} has been paid in full. Thank you for your payment.`,
+          invoiceId,
+          false
+        ]
+      );
+      
+      // Send "invoice paid" notification to doctor (without creating a second system activity)
+      if (doctorId) {
+        await db.query(
+          `INSERT INTO notifications 
+           (user_id, type, title, message, related_id, is_read, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+          [
+            doctorId,
+            'INVOICE_PAID',
+            'Invoice Paid in Full',
+            `Invoice #${invoiceId} for ${patientName.rows[0]?.name || 'Patient'} has been paid in full.`,
+            invoiceId,
+            false
+          ]
+        );
+      }
+    }
 
     res.status(201).json({
       message: 'Payment processed successfully',

@@ -249,6 +249,17 @@ const getNotificationTitle = (type, isForDoctor = false) => {
       return isForDoctor 
         ? 'Medical Record Uploaded' 
         : 'New Medical Record Available';
+
+    case 'PAYMENT_PROCESSED':
+      return 'Payment Processed';
+    case 'PAYMENT_RECEIVED':
+      return 'Payment Received';
+    case 'INVOICE_PAID':
+      return 'Invoice Paid in Full';
+    case 'INVOICE_CREATED':
+      return 'New Invoice Created';
+    case 'INVOICE_APPROVED':
+      return 'Invoice Ready for Payment';
       
     default:
       return 'System Update';
@@ -398,6 +409,58 @@ const sendMedicalRecordNotification = async (data) => {
   }
 };
 
+// Payment notification function
+const sendPaymentNotification = async (data) => {
+  try {
+    console.log('Creating payment notification:', data.type);
+    
+    // Create notification
+    const notification = await createNotification({
+      userId: data.userId,
+      type: data.type,
+      title: data.title || getNotificationTitle(data.type),
+      message: data.message,
+      relatedId: data.relatedId
+    });
+    
+    console.log('Created payment notification:', notification);
+
+    // Log the activity
+    let activityMessage = '';
+    switch (data.type) {
+      case 'PAYMENT_PROCESSED':
+        activityMessage = `Payment of $${data.amount} processed by ${data.patientName} for invoice #${data.invoiceId}`;
+        break;
+      case 'INVOICE_PAID':
+        activityMessage = `Invoice #${data.invoiceId} for ${data.patientName} has been paid in full`;
+        break;
+      case 'INVOICE_CREATED':
+        activityMessage = `New invoice created for ${data.patientName} by Dr. ${data.doctorName}`;
+        break;
+      case 'INVOICE_APPROVED':
+        activityMessage = `Invoice #${data.invoiceId} for ${data.patientName} has been approved`;
+        break;
+      default:
+        activityMessage = `Payment system update: ${data.message}`;
+    }
+    
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        data.type,
+        activityMessage,
+        data.relatedId
+      ]
+    );
+
+    return notification;
+  } catch (error) {
+    console.error('Error sending payment notification:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   router,
   sendAppointmentNotification: async (data) => {
@@ -441,5 +504,6 @@ module.exports = {
       console.error('Error sending appointment notification:', error);
     }
   },
-  sendMedicalRecordNotification
+  sendMedicalRecordNotification,
+  sendPaymentNotification
 };
