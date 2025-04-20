@@ -50,6 +50,8 @@ const DoctorMedicalRecords: React.FC = () => {
   const [emergencyReason, setEmergencyReason] = useState('');
   const [showEmergencyPatientModal, setShowEmergencyPatientModal] = useState(false);
   const [restrictedRecordsCount, setRestrictedRecordsCount] = useState<Record<number, number>>({});
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadedRecordTitle, setUploadedRecordTitle] = useState('');
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -162,14 +164,33 @@ const DoctorMedicalRecords: React.FC = () => {
   const handleUpload = async (formData: FormData) => {
     try {
       setLoading(true);
+      
+      // Get the record title from the form data for success message
+      let recordTitle = 'Medical record';
+      try {
+        const titleEntry = formData.get('title');
+        if (titleEntry && typeof titleEntry === 'string') {
+          recordTitle = titleEntry;
+        }
+      } catch (e) {
+        console.warn('Could not extract title from form data:', e);
+      }
+      
+      // Upload the record
       await medicalService.uploadRecord(formData);
 
       if (selectedPatient) {
         const records = await medicalService.getPatientRecords(selectedPatient.id);
         setPatientRecords(records);
       }
-
+      
+      // First close the upload modal
       setIsUploadModalOpen(false);
+      
+      // Then set data for success modal and show it
+      setUploadedRecordTitle(recordTitle);
+      setUploadSuccess(true);
+      
     } catch (error) {
       console.error('Error uploading record:', error);
       setError('Failed to upload medical record');
@@ -555,6 +576,48 @@ const DoctorMedicalRecords: React.FC = () => {
             {patients.filter(p => restrictedRecordsCount[p.id] > 0).length === 0 && (
               <p className="text-center py-4 text-white/60">No patients with restricted records</p>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Success Modal - this will appear after the upload modal closes */}
+      <Modal
+        isOpen={uploadSuccess}
+        onClose={() => setUploadSuccess(false)}
+        title="Record Uploaded Successfully"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-center p-6 bg-green-500/10 rounded-lg">
+            <div className="h-16 w-16 bg-green-500/20 rounded-full flex items-center justify-center">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-8 w-8 text-green-400" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M5 13l4 4L19 7" 
+                />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <h3 className="text-xl font-medium text-white/90 mb-2">Upload Complete</h3>
+            <p className="text-white/70">
+              <span className="font-medium">"{uploadedRecordTitle}"</span> has been successfully 
+              uploaded to <span className="font-medium">{selectedPatient?.name}'s</span> medical records.
+            </p>
+          </div>
+          
+          <div className="flex justify-center pt-4">
+            <Button variant="primary" onClick={() => setUploadSuccess(false)}>
+              Done
+            </Button>
           </div>
         </div>
       </Modal>
