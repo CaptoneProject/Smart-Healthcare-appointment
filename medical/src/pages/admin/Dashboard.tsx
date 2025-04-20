@@ -9,7 +9,8 @@ import {
   ArrowRight,
   LucideIcon,
   AlertTriangle,
-  UserMinus  // Add this import
+  UserMinus,
+  ClipboardCheck  // Add this import for insurance claims
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/api';
@@ -154,6 +155,9 @@ const AdminDashboard: React.FC = () => {
             } else if (activity.type.includes("APPOINTMENT")) {
               icon = Calendar;
               iconColor = "text-yellow-400";
+            } else if (activity.type.includes("INSURANCE_CLAIM")) {
+              icon = ClipboardCheck;
+              iconColor = "text-purple-400";
             }
             
             return {

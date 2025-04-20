@@ -101,6 +101,17 @@ router.post('/', authenticateToken, async (req, res) => {
       RETURNING *
     `, [invoiceId, req.user.userId, insuranceProvider, policyNumber, claimAmount, notes]);
     
+    // Log the activity in system_activities table
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INSURANCE_CLAIM_CREATED',
+        `Insurance claim created by ${req.user.name || 'Patient'} for ${insuranceProvider} with amount $${claimAmount}`,
+        result.rows[0].id
+      ]
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating insurance claim:', error);
@@ -155,6 +166,17 @@ router.put('/:claimId', authenticateToken, async (req, res) => {
       RETURNING *
     `, [insuranceProvider, policyNumber, claimAmount, notes, claimId]);
     
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INSURANCE_CLAIM_UPDATED',
+        `Insurance claim #${claimId} updated by ${req.user.name || 'Patient'}`,
+        claimId
+      ]
+    );
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating insurance claim:', error);
@@ -229,6 +251,17 @@ router.post('/:claimId/submit', authenticateToken, async (req, res) => {
        RETURNING *`,
       [documentUrls, claimReference, claimId]
     );
+
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INSURANCE_CLAIM_SUBMITTED',
+        `Insurance claim #${claimId} (ref: ${claimReference}) submitted by ${req.user.name || 'Patient'} with ${documentUrls.length} documents`,
+        claimId
+      ]
+    );
     
     res.json(result.rows[0]);
   } catch (error) {
@@ -268,6 +301,17 @@ router.delete('/:claimId', authenticateToken, async (req, res) => {
     
     // Delete the claim
     await db.query('DELETE FROM insurance_claims WHERE id = $1', [claimId]);
+
+    // Log the activity
+    await db.query(
+      `INSERT INTO system_activities (type, message, related_id) 
+       VALUES ($1, $2, $3)`,
+      [
+        'INSURANCE_CLAIM_DELETED',
+        `Insurance claim #${claimId} deleted by ${req.user.name || 'Patient'}`,
+        claimId
+      ]
+    );
     
     res.json({ success: true, message: 'Insurance claim deleted successfully' });
   } catch (error) {

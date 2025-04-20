@@ -178,6 +178,7 @@ const ActivityLog: React.FC = () => {
               <option value="doctor">Doctor Approvals</option>
               <option value="user">User Activities</option>
               <option value="appointment">Appointments</option>
+              <option value="INSURANCE_CLAIM">Insurance Claims</option>
             </select>
             
             <Button variant="outline" size="sm" className="flex items-center gap-2">
