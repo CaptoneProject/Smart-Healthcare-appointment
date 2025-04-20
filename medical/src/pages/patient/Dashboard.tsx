@@ -186,17 +186,17 @@ const PatientDashboard: React.FC = () => {
           const response = await api.get(`/payments/invoices/patient/${user.id}`);
           const invoices = response.data;
           
-          // Calculate total pending amount
+          // Calculate total pending amount - ONLY FOR APPROVED INVOICES
           pendingPaymentsAmount = invoices.reduce((total: number, invoice: any) => {
-            if (invoice.status.toLowerCase() !== 'paid') {
+            if (invoice.status.toLowerCase() === 'approved') {  // Changed from 'paid' check to specifically look for 'approved'
               return total + parseFloat(String(invoice.remaining_amount || invoice.amount || 0));
             }
             return total;
           }, 0);
           
-          // Get pending payment appointments
+          // Get pending payment appointments - ONLY FOR APPROVED INVOICES
           const pendingInvoices = invoices.filter((invoice: any) => 
-            invoice.status.toLowerCase() === 'pending' && 
+            invoice.status.toLowerCase() === 'approved' &&  // Changed from 'pending' to 'approved'
             invoice.appointment_id !== null
           );
           
@@ -256,14 +256,19 @@ const PatientDashboard: React.FC = () => {
         // Get pending invoices with appointment information already included
         const pendingPayments = await appointmentService.getConfirmedUnpaidAppointments(user.id);
         
-        // If we have pending payments, set them directly (no need for additional fetches)
+        // If we have pending payments, filter for only approved invoices
         if (pendingPayments && pendingPayments.length > 0) {
-          // Format dates and times as needed and ensure all required properties exist
-          const formattedPayments = pendingPayments.map(payment => ({
+          // Filter to only show approved invoices
+          const approvedPayments = pendingPayments.filter(
+            payment => payment.invoice_status === 'approved'
+          );
+          
+          // Format dates and times as needed
+          const formattedPayments = approvedPayments.map(payment => ({
             id: payment.id,
             doctor_name: payment.doctor_name,
-            date: payment.date.split('T')[0], // Ensure date is properly formatted
-            time: payment.time.substring(0, 5), // Ensure time is properly formatted
+            date: payment.date.split('T')[0],
+            time: payment.time.substring(0, 5),
             amount: parseFloat(String(payment.amount || 0)),
             remaining_amount: parseFloat(String(payment.remaining_amount || payment.amount || 0)),
             invoice_id: payment.invoice_id,

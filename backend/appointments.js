@@ -566,8 +566,8 @@ router.get('/patient/:patientId/confirmed-unpaid', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     
-    // Query appointments that are confirmed but have a pending invoice
-    // Calculate remaining_amount using payments table
+    // Query appointments that are confirmed but have an APPROVED invoice
+    // (not a pending invoice) - this is the key change
     const result = await db.query(`
       SELECT a.id, a.date, a.time, a.status, 
              u.name as doctor_name,
@@ -579,7 +579,7 @@ router.get('/patient/:patientId/confirmed-unpaid', async (req, res) => {
       JOIN invoices i ON a.id = i.appointment_id
       WHERE a.patient_id = $1 
       AND a.status = 'confirmed' 
-      AND i.status = 'pending'
+      AND i.status = 'approved'  -- Changed from 'pending' to 'approved'
       ORDER BY a.date ASC, a.time ASC
     `, [patientId]);
     
