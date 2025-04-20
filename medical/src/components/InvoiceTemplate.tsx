@@ -79,7 +79,7 @@ const InvoiceTemplateBase: ForwardRefRenderFunction<HTMLDivElement, InvoiceTempl
           <h3 style={{ fontWeight: 'bold', color: '#374151', marginBottom: '0.25rem' }}>Bill To:</h3>
           <p style={{ color: '#4b5563' }}>{invoice.patient_name || 'Patient'}</p>
           <p style={{ color: '#4b5563' }}>Patient ID: {invoice.id}</p>
-          <p style={{ color: '#4b5563' }}>Date of Service: {formatDate(invoice.created_at)}</p>
+          <p style={{ color: '#4b5563' }}>Date of Payment: {formatDate(invoice.created_at)}</p>
           <p style={{ color: '#4b5563' }}>Due Date: {formatDate(invoice.due_date)}</p>
         </div>
       </div>
