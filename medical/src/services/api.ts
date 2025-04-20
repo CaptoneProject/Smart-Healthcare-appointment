@@ -512,6 +512,17 @@ export const doctorService = {
       console.error('Error accessing emergency records:', error);
       throw error;
     }
+  },
+
+  // Get patient invoices for a specific doctor
+  getPatientInvoices: async (doctorId: number) => {
+    try {
+      const response = await api.get(`/payments/invoices/doctor/${doctorId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching doctor patient invoices:', error);
+      throw error;
+    }
   }
 };
 
@@ -740,6 +751,28 @@ export const adminService = {
   getRecordsWithEmergencyAccess: async (): Promise<MedicalRecord[]> => {
     const response = await api.get('/admin/medical-records/emergency');
     return response.data;
+  },
+
+  // Get all invoices (admin only)
+  getAllInvoices: async () => {
+    try {
+      const response = await api.get('/payments/invoices');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all invoices:', error);
+      throw error;
+    }
+  },
+  
+  // Get all patients for invoice creation
+  getAllPatients: async () => {
+    try {
+      const response = await api.get('/admin/patients');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      throw error;
+    }
   }
 };
 
@@ -855,6 +888,53 @@ export const medicalService = {
       return response.data;
     } catch (error) {
       console.error('Error getting signed URL:', error);
+      throw error;
+    }
+  }
+};
+
+// Add these methods to invoiceService
+export const invoiceService = {
+  // Create a new invoice
+  createInvoice: async (data: any) => {
+    try {
+      const response = await api.post('/payments/invoices', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      throw error;
+    }
+  },
+  
+  // Update an existing invoice
+  updateInvoice: async (id: number, data: any) => {
+    try {
+      const response = await api.put(`/payments/invoices/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      throw error;
+    }
+  },
+  
+  // Delete an invoice
+  deleteInvoice: async (id: number) => {
+    try {
+      const response = await api.delete(`/payments/invoices/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      throw error;
+    }
+  },
+  
+  // Approve an invoice
+  approveInvoice: async (id: number) => {
+    try {
+      const response = await api.put(`/payments/invoices/${id}/approve`);
+      return response.data;
+    } catch (error) {
+      console.error('Error approving invoice:', error);
       throw error;
     }
   }

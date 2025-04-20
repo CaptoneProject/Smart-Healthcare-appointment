@@ -1,3 +1,5 @@
+const { authenticateToken } = require('./middleware/auth');
+
 const express = require('express');
 const router = express.Router();
 const moment = require('moment');
@@ -614,6 +616,34 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error getting appointment by ID:', error);
     res.status(500).json({ error: 'Failed to get appointment' });
+  }
+});
+
+// Add this route to get appointments for a specific doctor
+
+// Get all appointments for a specific doctor
+router.get('/doctor/:doctorId', authenticateToken, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    // Ensure the requesting user is accessing their own data
+    if (req.user.userId !== parseInt(doctorId) && req.user.userType !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    const result = await db.query(`
+      SELECT a.*, 
+             u.name as patient_name
+      FROM appointments a
+      JOIN users u ON a.patient_id = u.id
+      WHERE a.doctor_id = $1
+      ORDER BY a.date DESC, a.time ASC
+    `, [doctorId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching doctor appointments:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
   }
 });
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./database');
-const { authenticateToken } = require('./middleware/auth');
+const { authenticateToken, requireRole } = require('./middleware/auth');
 
 // Initialize tables if they don't exist
 const initTables = async () => {
@@ -58,6 +58,58 @@ const initTables = async () => {
 // Uncomment this line when running for the first time
 // initTables();
 
+// CREATE invoice (admin/doctor)
+router.post('/invoices', authenticateToken, requireRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    const { patient_id, appointment_id, amount, due_date, description } = req.body;
+    const result = await db.query(
+      `INSERT INTO invoices (patient_id, appointment_id, amount, due_date, description, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
+      [patient_id, appointment_id, amount, due_date, description]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create invoice' });
+  }
+});
+
+// UPDATE invoice (admin/doctor)
+router.put('/invoices/:id', authenticateToken, requireRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    const { amount, due_date, description, status } = req.body;
+    const result = await db.query(
+      `UPDATE invoices SET amount=$1, due_date=$2, description=$3, status=$4 WHERE id=$5 RETURNING *`,
+      [amount, due_date, description, status, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update invoice' });
+  }
+});
+
+// DELETE invoice (admin/doctor)
+router.delete('/invoices/:id', authenticateToken, requireRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    await db.query(`DELETE FROM invoices WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete invoice' });
+  }
+});
+
+// APPROVE invoice (admin/doctor)
+router.put('/invoices/:id/approve', authenticateToken, requireRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE invoices SET status='approved' WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to approve invoice' });
+  }
+});
+
 // Get Patient Invoices
 router.get('/invoices/patient/:patientId', authenticateToken, async (req, res) => {
   try {
@@ -87,36 +139,21 @@ router.get('/invoices/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get invoice details
-    const invoiceResult = await db.query(
-      `SELECT i.*, 
-              u.name as patient_name
-       FROM invoices i
-       JOIN users u ON i.patient_id = u.id
-       WHERE i.id = $1`,
-      [id]
-    );
-
-    if (invoiceResult.rows.length === 0) {
+    const result = await db.query(`
+      SELECT i.*, 
+             u.name as patient_name,
+             COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0) as paid_amount,
+             (i.amount - COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)) as remaining_amount
+      FROM invoices i
+      JOIN users u ON i.patient_id = u.id
+      WHERE i.id = $1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Invoice not found' });
     }
-
-    // Get associated payments
-    const paymentsResult = await db.query(
-      `SELECT * FROM payments WHERE invoice_id = $1 ORDER BY payment_date DESC`,
-      [id]
-    );
-
-    // Calculate totals
-    const totalPaid = paymentsResult.rows.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-    const remainingAmount = parseFloat(invoiceResult.rows[0].amount) - totalPaid;
-
-    res.json({
-      invoice: invoiceResult.rows[0],
-      payments: paymentsResult.rows,
-      totalPaid,
-      remainingAmount
-    });
+    
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching invoice details:', error);
     res.status(500).json({ error: 'Failed to fetch invoice details' });
@@ -338,6 +375,110 @@ router.put('/payment-methods/:id/default', authenticateToken, async (req, res) =
   } catch (error) {
     console.error('Error updating default payment method:', error);
     res.status(500).json({ error: 'Failed to update default payment method' });
+  }
+});
+
+// Get all invoices for a specific doctor's patients
+router.get('/invoices/doctor/:doctorId', authenticateToken, requireRole(['doctor', 'admin']), async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    // This query gets invoices for patients who have appointments with this doctor
+    const result = await db.query(`
+      SELECT i.*, 
+             u.name as patient_name,
+             COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0) as paid_amount,
+             (i.amount - COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)) as remaining_amount
+      FROM invoices i
+      JOIN users u ON i.patient_id = u.id
+      WHERE i.patient_id IN (
+        SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1
+      )
+      ORDER BY i.created_at DESC
+    `, [doctorId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching doctor patient invoices:', error);
+    res.status(500).json({ error: 'Failed to fetch invoices' });
+  }
+});
+
+// Get all appointments for a doctor
+router.get('/appointments/doctor/:doctorId', authenticateToken, requireRole(['doctor', 'admin']), async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    const result = await db.query(`
+      SELECT a.*, 
+             u.name as patient_name
+      FROM appointments a
+      JOIN users u ON a.patient_id = u.id
+      WHERE a.doctor_id = $1
+      ORDER BY a.date DESC, a.time ASC
+    `, [doctorId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching doctor appointments:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
+  }
+});
+
+// Get all patients (for admin)
+router.get('/admin/patients', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT id, name, email
+      FROM users
+      WHERE role = 'patient'
+      ORDER BY name ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching patients:', error);
+    res.status(500).json({ error: 'Failed to fetch patients' });
+  }
+});
+
+// Get all appointments (for admin)
+router.get('/admin/appointments', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT a.*, 
+             p.name as patient_name,
+             d.name as doctor_name
+      FROM appointments a
+      JOIN users p ON a.patient_id = p.id
+      JOIN users d ON a.doctor_id = d.id
+      ORDER BY a.date DESC, a.time ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
+  }
+});
+
+// Get all invoices (admin only)
+router.get('/invoices', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT i.*, 
+             u.name as patient_name,
+             COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0) as paid_amount,
+             (i.amount - COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)) as remaining_amount
+      FROM invoices i
+      JOIN users u ON i.patient_id = u.id
+      ORDER BY i.created_at DESC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching all invoices:', error);
+    res.status(500).json({ error: 'Failed to fetch invoices' });
   }
 });
 

@@ -7,7 +7,8 @@ import {
   LogOut,
   Clock,
   Home,
-  Menu
+  Menu,
+  CreditCard // Add this import
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from '../components/ui/NotificationBell';
@@ -23,6 +24,7 @@ const DoctorLayout = () => {
     { path: '/d/appointments', label: 'Appointments', icon: Calendar },
     { path: '/d/schedule', label: 'My Schedule', icon: Clock },
     { path: '/d/records', label: 'Medical Records', icon: FileText },
+    { path: '/d/invoices', label: 'Invoices', icon: CreditCard }, // Add this to your navigationItems array
   ];
 
   const handleLogout = async () => {

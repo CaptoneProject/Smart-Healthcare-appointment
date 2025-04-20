@@ -24,6 +24,8 @@ import AppointmentsManagement from './pages/admin/AppointmentsManagement';
 import ActivityLog from './pages/admin/ActivityLog'; // Import the new ActivityLog component
 import MedicalRecords from './pages/doctor/MedicalRecords'; // Import the new MedicalRecords component
 import MedicalRecordsManagement from './pages/admin/MedicalRecordsManagement'; // Import the new MedicalRecordsManagement component
+import AdminInvoices from './pages/admin/Invoices'; // Import the new AdminInvoices component
+import DoctorInvoices from './pages/doctor/Invoices'; // Import the new DoctorInvoices component
 
 // Update the ProtectedRoute to handle admin routes with better logging
 const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
@@ -115,6 +117,7 @@ const AppWithAuth = () => {
         <Route path="credentials" element={<DoctorCredentialsForm />} />
         <Route path="appointments" element={<DoctorAppointments />} />
         <Route path="records" element={<MedicalRecords />} /> {/* New route */}
+        <Route path="invoices" element={<DoctorInvoices />} /> {/* New route */}
       </Route>
       
       {/* Standalone doctor routes */}
@@ -146,6 +149,7 @@ const AppWithAuth = () => {
             <MedicalRecordsManagement />
           </ErrorBoundary>
         } />
+        <Route path="invoices" element={<AdminInvoices />} /> {/* New route */}
         {/* Other admin routes */}
       </Route>
       

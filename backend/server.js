@@ -4,6 +4,7 @@ const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./database');
+const doctorRoutes = require('./doctorRoutes');
 
 const app = express();
 
@@ -249,16 +250,17 @@ async function initDatabase() {
     const doctorSchedulingRoutes = require('./doctorScheduling');
     const adminRoutes = require('./adminRoutes');
     const paymentRoutes = require('./paymentRoutes');
-    const { authenticateToken, isAdmin } = require('./middleware/auth');
+    const { authenticateToken, isAdmin, requireRole } = require('./middleware/auth');
     
-    // Use routers
+    // Configure routes
     app.use('/api/auth', authRouter);
-    app.use('/api/appointments', appointmentsRoutes);
-    app.use('/api/doctor', doctorSchedulingRoutes);
-    app.use('/api/notifications', notificationsRouter);
-    app.use('/api/medical', medicalRoutes);
+    app.use('/api/appointments', appointmentsRoutes); 
+    app.use('/api/doctor', doctorRoutes);
+    app.use('/api/medical', authenticateToken, medicalRoutes);
     app.use('/api/admin', authenticateToken, adminRoutes);
     app.use('/api/payments', paymentRoutes);
+    app.use('/api/notifications', authenticateToken, notificationsRouter);
+    app.use('/api/scheduling', authenticateToken, doctorSchedulingRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {

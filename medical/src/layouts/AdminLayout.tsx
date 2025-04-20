@@ -9,7 +9,8 @@ import {
   LogOut,
   Shield,
   Calendar,
-  FileText
+  FileText,
+  CreditCard // Add this import
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,6 +26,7 @@ const AdminLayout = () => {
     { icon: Calendar, label: 'Appointments', path: '/admin/appointments' },
     { icon: Settings, label: 'System Settings', path: '/admin/settings' },
     { path: '/admin/medical-records', label: 'Medical Records', icon: FileText },
+    { icon: CreditCard, label: 'Invoices', path: '/admin/invoices' }, // Add this to your navigationItems array
   ];
 
   const handleLogout = async () => {

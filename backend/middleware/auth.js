@@ -30,7 +30,29 @@ const isAdmin = (req, res, next) => {
   }
 };
 
+// Middleware to check if user has required role
+const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Check if user.userType (or user.role) is in the allowedRoles array
+    const userRole = req.user.userType || req.user.user_type || req.user.role;
+    
+    if (allowedRoles.includes(userRole)) {
+      next();
+    } else {
+      return res.status(403).json({ 
+        error: 'Access denied',
+        message: `This action requires one of these roles: ${allowedRoles.join(', ')}`
+      });
+    }
+  };
+};
+
 module.exports = {
   authenticateToken,
-  isAdmin
+  isAdmin,
+  requireRole
 };

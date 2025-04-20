@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./database');
+const { authenticateToken, isAdmin } = require('./middleware/auth');
 
 // Middleware to check if user is admin
-const isAdmin = (req, res, next) => {
+const isAdminMiddleware = (req, res, next) => {
   console.log('Checking admin privileges for:', req.user);
   
   if (req.user && req.user.userType === 'admin') {
@@ -50,7 +51,7 @@ const logSystemActivity = async (type, message, relatedId = null) => {
 };
 
 // Get doctor credentials for review
-router.get('/doctor-credentials', isAdmin, async (req, res) => {
+router.get('/doctor-credentials', isAdminMiddleware, async (req, res) => {
   try {
     const { filter } = req.query;
     
@@ -88,7 +89,7 @@ router.get('/doctor-credentials', isAdmin, async (req, res) => {
 });
 
 // Update doctor status (approve/reject)
-router.put('/doctor-credentials/status/:id', isAdmin, async (req, res) => {
+router.put('/doctor-credentials/status/:id', isAdminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -137,7 +138,7 @@ router.put('/doctor-credentials/status/:id', isAdmin, async (req, res) => {
 });
 
 // Get system stats for admin dashboard
-router.get('/system-stats', isAdmin, async (req, res) => {
+router.get('/system-stats', isAdminMiddleware, async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     
@@ -210,7 +211,7 @@ router.get('/system-stats', isAdmin, async (req, res) => {
 });
 
 // Get all users with details
-router.get('/users', isAdmin, async (req, res) => {
+router.get('/users', isAdminMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
       SELECT 
@@ -232,7 +233,7 @@ router.get('/users', isAdmin, async (req, res) => {
 });
 
 // Get today's appointments with details
-router.get('/today-appointments', isAdmin, async (req, res) => {
+router.get('/today-appointments', isAdminMiddleware, async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     
@@ -267,7 +268,7 @@ router.get('/today-appointments', isAdmin, async (req, res) => {
 });
 
 // Add a more comprehensive appointments endpoint
-router.get('/appointments', isAdmin, async (req, res) => {
+router.get('/appointments', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { dateFilter = 'today' } = req.query;
     let dateCondition = '';
@@ -317,7 +318,7 @@ router.get('/appointments', isAdmin, async (req, res) => {
 });
 
 // Update the activities endpoint
-router.get('/activities', isAdmin, async (req, res) => {
+router.get('/activities', isAdminMiddleware, async (req, res) => {
   try {
     // Check if the table exists
     const tableExists = await db.query(`
@@ -352,7 +353,7 @@ router.get('/activities', isAdmin, async (req, res) => {
 });
 
 // Add this endpoint to handle user deletion
-router.delete('/users/:id', isAdmin, async (req, res) => {
+router.delete('/users/:id', isAdminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -446,7 +447,7 @@ router.delete('/users/:id', isAdmin, async (req, res) => {
 });
 
 // Emergency access endpoint
-router.post('/medical-records/emergency-access', isAdmin, async (req, res) => {
+router.post('/medical-records/emergency-access', isAdminMiddleware, async (req, res) => {
   try {
     const { patientId, reason } = req.body;
     
@@ -484,7 +485,7 @@ router.post('/medical-records/emergency-access', isAdmin, async (req, res) => {
 });
 
 // Add to adminRoutes.js
-router.get('/medical-records/audit-trail', isAdmin, async (req, res) => {
+router.get('/medical-records/audit-trail', isAdminMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
       SELECT 
@@ -507,7 +508,7 @@ router.get('/medical-records/audit-trail', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/audit-trail', isAdmin, async (req, res) => {
+router.get('/audit-trail', isAdminMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
       SELECT 
@@ -530,7 +531,7 @@ router.get('/audit-trail', isAdmin, async (req, res) => {
 });
 
 // Add after existing routes
-router.get('/medical-records/analytics', isAdmin, async (req, res) => {
+router.get('/medical-records/analytics', isAdminMiddleware, async (req, res) => {
   try {
     // Get total records count
     const totalRecords = await db.query(
@@ -572,7 +573,7 @@ router.get('/medical-records/analytics', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/medical-records/access-patterns', isAdmin, async (req, res) => {
+router.get('/medical-records/access-patterns', isAdminMiddleware, async (req, res) => {
   try {
     const patterns = await db.query(`
       SELECT 
@@ -598,7 +599,7 @@ router.get('/medical-records/access-patterns', isAdmin, async (req, res) => {
 });
 
 // Add this endpoint to fetch all medical records for admin
-router.get('/medical-records', isAdmin, async (req, res) => {
+router.get('/medical-records', isAdminMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
       SELECT 
@@ -619,7 +620,7 @@ router.get('/medical-records', isAdmin, async (req, res) => {
 });
 
 // Add this endpoint to fetch access logs for a specific record
-router.get('/medical-records/:id/access-logs', isAdmin, async (req, res) => {
+router.get('/medical-records/:id/access-logs', isAdminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -659,7 +660,7 @@ router.get('/medical-records/:id/access-logs', isAdmin, async (req, res) => {
 });
 
 // Add endpoint to update record access settings
-router.put('/medical-records/:id/access', isAdmin, async (req, res) => {
+router.put('/medical-records/:id/access', isAdminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { action } = req.body;
@@ -708,7 +709,7 @@ router.put('/medical-records/:id/access', isAdmin, async (req, res) => {
 });
 
 // Add this endpoint to get records with emergency access
-router.get('/medical-records/emergency-access', isAdmin, async (req, res) => {
+router.get('/medical-records/emergency-access', isAdminMiddleware, async (req, res) => {
   try {
     // Get records that have had emergency access
     const result = await db.query(
@@ -726,7 +727,7 @@ router.get('/medical-records/emergency-access', isAdmin, async (req, res) => {
 });
 
 // This endpoint retrieves records that have had emergency access
-router.get('/medical-records/emergency', isAdmin, async (req, res) => {
+router.get('/medical-records/emergency', isAdminMiddleware, async (req, res) => {
   try {
     // Get records that have had emergency access
     const result = await db.query(`
@@ -746,6 +747,45 @@ router.get('/medical-records/emergency', isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching emergency access records:', error);
     res.status(500).json({ error: 'Failed to fetch records with emergency access' });
+  }
+});
+
+// Add these routes to your adminRoutes.js file
+
+// Get all patients (for admin)
+router.get('/patients', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT id, name, email
+      FROM users
+      WHERE user_type = 'patient'
+      ORDER BY name ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching patients:', error);
+    res.status(500).json({ error: 'Failed to fetch patients' });
+  }
+});
+
+// Get all appointments (for admin)
+router.get('/appointments', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT a.*, 
+             p.name as patient_name,
+             d.name as doctor_name
+      FROM appointments a
+      JOIN users p ON a.patient_id = p.id
+      JOIN users d ON a.doctor_id = d.id
+      ORDER BY a.date DESC, a.time ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
   }
 });
 
