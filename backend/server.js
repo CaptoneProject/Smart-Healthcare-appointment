@@ -260,7 +260,7 @@ async function initDatabase() {
     app.use('/api/admin', authenticateToken, adminRoutes);
     app.use('/api/payments', paymentRoutes);
     app.use('/api/notifications', authenticateToken, notificationsRouter);
-    app.use('/api/scheduling', authenticateToken, doctorSchedulingRoutes);
+    app.use('/api/doctor', authenticateToken, doctorSchedulingRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {
