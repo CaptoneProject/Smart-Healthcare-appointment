@@ -327,17 +327,20 @@ const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userType, userId 
                       <Edit className="w-4 h-4" />
                     </Button>
                     
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => {
-                        setSelectedInvoice(invoice);
-                        setIsDeleteModalOpen(true);
-                      }}
-                      title="Delete Invoice"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </Button>
+                    {/* Only show delete button for pending invoices */}
+                    {invoice.status === 'pending' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        title="Delete Invoice"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    )}
                     
                     {invoice.status === 'pending' && (
                       <Button 

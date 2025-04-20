@@ -9,7 +9,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  FileText,
   Receipt,
   X,
   Star
@@ -126,7 +125,6 @@ const PatientPayments = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isViewDetailsOpen, setIsViewDetailsOpen] = useState<boolean>(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
-  const [processingInvoiceId, setProcessingInvoiceId] = useState<number | null>(null);
   const [isPaymentSuccess, setIsPaymentSuccess] = useState<boolean>(false);
   const [paidInvoice, setPaidInvoice] = useState<Invoice | null>(null);
   const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState<boolean>(false);
@@ -193,7 +191,6 @@ const PatientPayments = () => {
       setIsPaymentConfirmOpen(false);
       
       // Set processing state
-      setProcessingInvoiceId(invoiceToPayNow.id);
       setIsProcessingPayment(true);
       
       // Process the payment (with artificial delay for UI feedback)
@@ -218,14 +215,12 @@ const PatientPayments = () => {
           console.error("Payment error:", err);
           toast.error("Failed to process payment. Please try again.");
           setIsProcessingPayment(false);
-          setProcessingInvoiceId(null);
         }
       }, 1500); // Simulate processing time
     } catch (err) {
       console.error("Payment error:", err);
       toast.error("Failed to process payment. Please try again.");
       setIsProcessingPayment(false);
-      setProcessingInvoiceId(null);
     } finally {
       setInvoiceToPayNow(null);
     }
@@ -557,7 +552,7 @@ const PatientPayments = () => {
       {/* Filters */}
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          {['all', 'pending', 'paid', 'overdue'].map((filter) => (
+          {['all', 'pending', 'approved', 'paid', 'overdue'].map((filter) => (
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
@@ -596,95 +591,58 @@ const PatientPayments = () => {
         </div>
       ) : filteredInvoices.length > 0 ? (
         <div className="space-y-4">
-          {filteredInvoices.map(invoice => (
-            <div key={invoice.id} className="bg-slate-900 rounded-xl border border-white/10 p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex items-start space-x-4">
-                  <div className={`p-2 rounded-lg ${
-                    invoice.status.toLowerCase() === 'paid' ? 'bg-green-500/20 text-green-400' :
-                    invoice.status.toLowerCase() === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
-                    'bg-red-500/20 text-red-400'
-                  }`}>
-                    <Receipt className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-lg">{invoice.description || 'Medical Service'}</h3>
-                    <div className="flex items-center space-x-3 mt-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        invoice.status.toLowerCase() === 'paid' ? 'bg-green-500/20 text-green-400' : invoice.status.toLowerCase() === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {invoice.status}
-                      </span>
-                      <span className="text-xl font-semibold">${parseFloat(String(invoice.amount || 0)).toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {invoice.remaining_amount > 0 && (
-                    <div className="text-sm text-gray-400">
-                      Remaining: ${parseFloat(String(invoice.remaining_amount || 0)).toFixed(2)}
-                    </div>
-                  )}
-                </div>
-              </div>
+          <table className="min-w-full bg-slate-900 rounded-xl border border-white/10">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Description</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Status</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map(invoice => (
+                <tr key={invoice.id} className={invoice.status !== 'approved' && invoice.status !== 'paid' ? 'opacity-60' : ''}>
+                  <td className="px-6 py-4">{invoice.description || 'Medical Service'}</td>
+                  <td className="px-6 py-4">${parseFloat(String(invoice.amount || 0)).toFixed(2)}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 text-xs rounded-full capitalize inline-flex items-center space-x-1 ${
+                      invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                      invoice.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-yellow-500/20 text-yellow-400'
+                    }`}>
+                      {invoice.status === 'paid' ? <CheckCircle className="w-3 h-3 mr-1" /> : 
+                       invoice.status === 'approved' ? <Clock className="w-3 h-3 mr-1" /> : 
+                       <AlertCircle className="w-3 h-3 mr-1" />}
+                      {invoice.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 flex items-center space-x-2">
+                    {/* View Details Button */}
+                    <button
+                      onClick={() => handleViewDetails(invoice)}
+                      className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-600 transition-colors"
+                    >
+                      Details
+                    </button>
 
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-400">Invoice Date</p>
-                  <p className="text-sm">{new Date(invoice.created_at).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Due Date</p>
-                  <p className="text-sm">{new Date(invoice.due_date).toLocaleDateString()}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-                <button 
-                  onClick={() => handleViewDetails(invoice)}
-                  className="flex items-center px-3 py-1.5 bg-white/5 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  View Details
-                </button>
-                
-                {invoice.status.toLowerCase() !== 'paid' && invoice.remaining_amount > 0 && (
-                  <button 
-                    onClick={() => handlePayNow(invoice)}
-                    disabled={isProcessingPayment && processingInvoiceId === invoice.id}
-                    className={`flex items-center px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      isProcessingPayment && processingInvoiceId === invoice.id
-                        ? 'bg-blue-500/50 text-blue-200 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    {isProcessingPayment && processingInvoiceId === invoice.id ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Pay Now
-                      </>
-                    )}
-                  </button>
-                )}
-                
-                {invoice.status.toLowerCase() === 'paid' && (
-                  <button 
-                    onClick={() => handleDownloadReceipt(invoice)}
-                    className="flex items-center text-sm text-gray-400 hover:text-white"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Receipt
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+                    {/* Pay Now Button */}
+                    <button
+                      disabled={invoice.status !== 'approved'}
+                      onClick={() => handlePayNow(invoice)}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        invoice.status !== 'approved'
+                          ? 'bg-gray-500/50 text-gray-200 cursor-not-allowed'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }`}
+                    >
+                      {invoice.status === 'pending' ? 'Awaiting Approval' : 'Pay Now'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="bg-slate-900 rounded-xl border border-white/10 p-12 flex flex-col items-center justify-center">

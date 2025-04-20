@@ -90,9 +90,31 @@ router.put('/invoices/:id', authenticateToken, requireRole(['admin', 'doctor']),
 // DELETE invoice (admin/doctor)
 router.delete('/invoices/:id', authenticateToken, requireRole(['admin', 'doctor']), async (req, res) => {
   try {
+    // First check invoice status
+    const checkResult = await db.query(
+      'SELECT status FROM invoices WHERE id = $1',
+      [req.params.id]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    
+    const invoice = checkResult.rows[0];
+    
+    // Only allow deletion of pending invoices
+    if (invoice.status !== 'pending') {
+      return res.status(400).json({ 
+        error: 'Cannot delete invoice', 
+        message: `This invoice is already ${invoice.status}. Only pending invoices can be deleted.`
+      });
+    }
+    
+    // If pending, proceed with deletion
     await db.query(`DELETE FROM invoices WHERE id=$1`, [req.params.id]);
     res.json({ success: true });
   } catch (error) {
+    console.error('Error deleting invoice:', error);
     res.status(500).json({ error: 'Failed to delete invoice' });
   }
 });
@@ -180,6 +202,14 @@ router.post('/payments', authenticateToken, async (req, res) => {
     }
 
     const invoice = invoiceResult.rows[0];
+    
+    // Add this check
+    if (invoice.status !== 'approved') {
+      return res.status(400).json({ 
+        error: 'Payment rejected', 
+        message: 'This invoice has not been approved for payment yet.'
+      });
+    }
     
     // Create a simple transaction ID
     const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
