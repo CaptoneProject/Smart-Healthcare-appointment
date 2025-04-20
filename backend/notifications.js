@@ -260,6 +260,11 @@ const getNotificationTitle = (type, isForDoctor = false) => {
       return 'New Invoice Created';
     case 'INVOICE_APPROVED':
       return 'Invoice Ready for Payment';
+
+    case 'NEW_MESSAGE':
+      return isForDoctor 
+        ? 'New Message from Patient' 
+        : 'New Message from Doctor';
       
     default:
       return 'System Update';

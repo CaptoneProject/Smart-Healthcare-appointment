@@ -1,61 +1,116 @@
-import { ReactNode, ElementType, ComponentPropsWithoutRef } from 'react';
+import React, { ReactNode, ElementType } from 'react';
+import { Link } from 'react-router-dom';
 
-type ButtonProps<E extends ElementType = 'button'> = {
+interface ButtonProps {
   children: ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  icon?: ReactNode;
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success' | 'ghost';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
   className?: string;
   disabled?: boolean;
-  as?: E;
-} & Omit<ComponentPropsWithoutRef<E>, 'children' | 'onClick' | 'className' | 'disabled' | 'type'>;
+  loading?: boolean;
+  as?: 'button' | 'link' | ElementType;
+  to?: string;
+  title?: string;
+  icon?: ReactNode; // Add the icon prop
+}
 
-export const Button = <E extends ElementType = 'button'>({
+export const Button: React.FC<ButtonProps> = ({
   children,
   onClick,
   type = 'button',
   variant = 'primary',
   size = 'md',
-  icon,
   className = '',
   disabled = false,
-  as,
-  ...props
-}: ButtonProps<E>) => {
-  const baseClasses = 'rounded-lg font-medium flex items-center justify-center transition-all duration-300';
-  
-  const variantClasses = {
-    primary: 'bg-blue-500/80 backdrop-blur-sm text-white hover:bg-blue-600/80 border border-blue-400/20 shadow-lg',
-    secondary: 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/90 border border-white/5',
-    outline: 'bg-transparent text-white/60 hover:text-white/90 border border-white/10',
-    ghost: 'bg-transparent text-white/60 hover:text-white/90 hover:bg-white/5',
-    danger: 'bg-red-500/80 backdrop-blur-sm text-white hover:bg-red-600/80 border border-red-400/20 shadow-lg'
+  loading = false,
+  as = 'button',
+  to = '/',
+  title,
+  icon, // Add icon to the destructured props
+  ...rest
+}) => {
+  const variantStyles = {
+    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+    secondary: 'bg-gray-600 hover:bg-gray-700 text-white',
+    outline: 'bg-transparent border border-white/20 hover:bg-white/5 text-white',
+    danger: 'bg-red-600 hover:bg-red-700 text-white',
+    success: 'bg-green-600 hover:bg-green-700 text-white',
+    ghost: 'bg-transparent hover:bg-white/10 text-white',
   };
-  
-  const sizeClasses = {
+
+  const sizeStyles = {
     sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base'
+    md: 'px-4 py-2',
+    lg: 'px-5 py-2.5 text-lg',
+    icon: 'p-2 w-10 h-10 flex items-center justify-center',
   };
 
-  const combinedClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
-    disabled ? 'opacity-50 cursor-not-allowed' : ''
-  }`;
+  const baseStyles = `
+    rounded-lg
+    font-medium
+    transition-colors
+    focus:outline-none
+    focus:ring-2
+    focus:ring-offset-1
+    focus:ring-blue-500
+    ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+    ${variantStyles[variant]}
+    ${sizeStyles[size]}
+    ${className}
+  `;
 
-  const Component = as || 'button';
-
-  return (
-    <Component
-      {...props}
-      type={Component === 'button' ? type : undefined}
-      onClick={onClick}
-      disabled={disabled}
-      className={combinedClasses}
-    >
-      {icon && <span className="mr-2">{icon}</span>}
+  // Show loading spinner if loading is true
+  const content = loading ? (
+    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+  ) : (
+    // If icon exists, render it alongside the content
+    <>
+      {icon && <span className="mr-2 flex items-center">{icon}</span>}
       {children}
-    </Component>
+    </>
+  );
+
+  // Handle case when 'as' is the Link component itself
+  if (as === Link) {
+    return (
+      <Link to={to} className={`${baseStyles} flex items-center justify-center`} title={title} {...rest}>
+        {content}
+      </Link>
+    );
+  }
+
+  // Handle case when 'as' is the string 'link'
+  if (as === 'link') {
+    return (
+      <Link to={to} className={`${baseStyles} flex items-center justify-center`} title={title} {...rest}>
+        {content}
+      </Link>
+    );
+  }
+
+  // Handle case when 'as' is a custom component
+  if (typeof as !== 'string') {
+    const Component = as;
+    return (
+      <Component to={to} className={`${baseStyles} flex items-center justify-center`} title={title} {...rest}>
+        {content}
+      </Component>
+    );
+  }
+
+  // Default case: render a button
+  return (
+    <button
+      type={type}
+      className={`${baseStyles} flex items-center justify-center`}
+      onClick={onClick}
+      disabled={disabled || loading}
+      title={title}
+      {...rest}
+    >
+      {content}
+    </button>
   );
 };

@@ -253,6 +253,23 @@ async function initDatabase() {
     `);
     console.log('Insurance claims table initialized');
 
+    // 12. Initialize messaging system
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver ON messages (sender_id, receiver_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+    `);
+    console.log('Messaging system tables initialized');
+
     console.log('All database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -275,6 +292,7 @@ async function initDatabase() {
     const adminRoutes = require('./adminRoutes');
     const paymentRoutes = require('./paymentRoutes');
     const insuranceRoutes = require('./insuranceRoutes');
+    const messagingRoutes = require('./messagingRoutes');
     const { authenticateToken, isAdmin, requireRole } = require('./middleware/auth');
     
     // Configure routes
@@ -287,6 +305,7 @@ async function initDatabase() {
     app.use('/api/notifications', authenticateToken, notificationsRouter);
     app.use('/api/doctor', authenticateToken, doctorSchedulingRoutes);
     app.use('/api/insurance', insuranceRoutes);
+    app.use('/api/messaging', authenticateToken, messagingRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {

@@ -7,7 +7,8 @@ import {
   Pill, 
   CreditCard, 
   User,
-  LogOut 
+  LogOut,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from '../components/ui/NotificationBell';
@@ -23,7 +24,8 @@ const PatientLayout = () => {
     { icon: FileText, label: 'Medical Records', path: '/p/records' },
     { icon: Pill, label: 'Prescriptions', path: '/p/prescriptions' },
     { icon: CreditCard, label: 'Payments', path: '/p/payments' },
-    { icon: FileText, label: 'Insurance Claims', path: '/p/insurance' }
+    { icon: FileText, label: 'Insurance Claims', path: '/p/insurance' },
+    { icon: MessageCircle, label: 'Messages', path: '/p/messages' }
   ];
 
   const handleLogout = async () => {

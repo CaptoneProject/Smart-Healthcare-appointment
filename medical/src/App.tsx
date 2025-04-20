@@ -27,6 +27,8 @@ import MedicalRecordsManagement from './pages/admin/MedicalRecordsManagement'; /
 import AdminInvoices from './pages/admin/Invoices'; // Import the new AdminInvoices component
 import DoctorInvoices from './pages/doctor/Invoices'; // Import the new DoctorInvoices component
 import InsuranceClaims from './pages/patient/InsuranceClaims'; // Add this import
+import PatientMessages from './pages/patient/Messages';
+import DoctorMessages from './pages/doctor/Messages';
 
 // Update the ProtectedRoute to handle admin routes with better logging
 interface ProtectedRouteProps {
@@ -129,6 +131,7 @@ const AppWithAuth = () => {
         <Route path="prescriptions" element={<PatientPrescriptions />} />
         <Route path="payments" element={<PatientPayments />} />
         <Route path="insurance" element={<InsuranceClaims />} />
+        <Route path="messages" element={<PatientMessages />} />
       </Route>
       
       {/* Doctor Routes */}
@@ -143,6 +146,7 @@ const AppWithAuth = () => {
         <Route path="appointments" element={<DoctorAppointments />} />
         <Route path="records" element={<MedicalRecords />} /> {/* New route */}
         <Route path="invoices" element={<DoctorInvoices />} /> {/* New route */}
+        <Route path="messages" element={<DoctorMessages />} />
       </Route>
       
       {/* Standalone doctor routes */}

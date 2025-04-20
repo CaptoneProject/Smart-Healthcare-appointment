@@ -11,6 +11,9 @@ import {
 import { notificationService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import messagingService from '../../services/messagingService';
+import { Link } from 'react-router-dom';
+import { Button } from '../ui/Button';
 
 interface Notification {
   id: number;
@@ -42,6 +45,7 @@ export const NotificationBell: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -91,6 +95,24 @@ export const NotificationBell: React.FC = () => {
     return () => clearInterval(interval);
   }, [user?.id]);
 
+  useEffect(() => {
+    const fetchUnreadMessages = async () => {
+      try {
+        const count = await messagingService.getUnreadCount();
+        setUnreadMessages(count);
+      } catch (error) {
+        console.error('Error fetching unread messages:', error);
+      }
+    };
+
+    fetchUnreadMessages();
+    
+    // Poll for new messages every 30 seconds
+    const interval = setInterval(fetchUnreadMessages, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   // Add this to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -104,6 +126,7 @@ export const NotificationBell: React.FC = () => {
   }, []);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  const totalUnread = unreadCount + unreadMessages;
 
   const handleMarkAsRead = async (id: number) => {
     try {
@@ -140,9 +163,9 @@ export const NotificationBell: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
       >
         <Bell className="w-5 h-5 text-white" />
-        {unreadCount > 0 && (
+        {totalUnread > 0 && (
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-            {unreadCount}
+            {totalUnread}
           </span>
         )}
       </button>
@@ -164,6 +187,26 @@ export const NotificationBell: React.FC = () => {
           </div>
 
           <div className="max-h-96 overflow-y-auto">
+            {unreadMessages > 0 && (
+              <div className="mb-2 p-2 bg-blue-500/10 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-blue-400">New Messages</h4>
+                    <p className="text-sm text-white/60">
+                      You have {unreadMessages} unread {unreadMessages === 1 ? 'message' : 'messages'}
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    as={Link}
+                    to={user?.userType === 'patient' ? '/p/messages' : '/d/messages'}
+                  >
+                    View
+                  </Button>
+                </div>
+              </div>
+            )}
             {isLoading ? (
               <div className="p-4 text-center text-white/60">Loading...</div>
             ) : error ? (
