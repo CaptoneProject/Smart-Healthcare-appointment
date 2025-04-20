@@ -23,6 +23,7 @@ const PatientLayout = () => {
     { icon: FileText, label: 'Medical Records', path: '/p/records' },
     { icon: Pill, label: 'Prescriptions', path: '/p/prescriptions' },
     { icon: CreditCard, label: 'Payments', path: '/p/payments' },
+    { icon: FileText, label: 'Insurance Claims', path: '/p/insurance' }
   ];
 
   const handleLogout = async () => {

@@ -320,6 +320,13 @@ const PatientDashboard: React.FC = () => {
       value: loading ? "..." : `$${stats.pendingPayments.toFixed(2)}`,
       footer: "View payments",
       link: "/p/payments"
+    },
+    {
+      icon: FileText,
+      title: "Insurance Claims",
+      value: loading ? "..." : "Manage",
+      footer: "Submit & track claims",
+      link: "/p/insurance"
     }
   ];
 

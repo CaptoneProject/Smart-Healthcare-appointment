@@ -229,6 +229,30 @@ async function initDatabase() {
     `);
     console.log('Payment and invoice tables initialized');
 
+    // 11. Initialize insurance claims table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS insurance_claims (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER REFERENCES invoices(id),
+        patient_id INTEGER REFERENCES users(id),
+        insurance_provider VARCHAR(255) NOT NULL,
+        policy_number VARCHAR(100) NOT NULL,
+        claim_amount DECIMAL(10,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'draft', -- draft, submitted, approved, rejected, reimbursed
+        submission_date TIMESTAMP,
+        approval_date TIMESTAMP,
+        rejection_reason TEXT,
+        reimbursement_amount DECIMAL(10,2),
+        reimbursement_date TIMESTAMP,
+        claim_reference VARCHAR(100),
+        documents_urls TEXT[], -- This is the critical field for storing S3 URLs
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Insurance claims table initialized');
+
     console.log('All database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -250,6 +274,7 @@ async function initDatabase() {
     const doctorSchedulingRoutes = require('./doctorScheduling');
     const adminRoutes = require('./adminRoutes');
     const paymentRoutes = require('./paymentRoutes');
+    const insuranceRoutes = require('./insuranceRoutes');
     const { authenticateToken, isAdmin, requireRole } = require('./middleware/auth');
     
     // Configure routes
@@ -261,6 +286,7 @@ async function initDatabase() {
     app.use('/api/payments', paymentRoutes);
     app.use('/api/notifications', authenticateToken, notificationsRouter);
     app.use('/api/doctor', authenticateToken, doctorSchedulingRoutes);
+    app.use('/api/insurance', insuranceRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {

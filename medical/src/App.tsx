@@ -26,9 +26,16 @@ import MedicalRecords from './pages/doctor/MedicalRecords'; // Import the new Me
 import MedicalRecordsManagement from './pages/admin/MedicalRecordsManagement'; // Import the new MedicalRecordsManagement component
 import AdminInvoices from './pages/admin/Invoices'; // Import the new AdminInvoices component
 import DoctorInvoices from './pages/doctor/Invoices'; // Import the new DoctorInvoices component
+import InsuranceClaims from './pages/patient/InsuranceClaims'; // Add this import
 
 // Update the ProtectedRoute to handle admin routes with better logging
-const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userType: string }) => {
+interface ProtectedRouteProps {
+  children: JSX.Element;
+  userType?: string;
+  allowedRoles?: string[];
+}
+
+const ProtectedRoute = ({ children, userType, allowedRoles }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,8 +44,19 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
     if (!loading) {
       if (!user) {
         navigate('/', { replace: true });
-      } else if (user.userType !== userType) {
+      } else if (userType && user.userType !== userType) {
         // Redirect to appropriate dashboard
+        if (user.userType === 'patient') {
+          navigate('/p/dashboard', { replace: true });
+        } else if (user.userType === 'doctor') {
+          navigate('/d/dashboard', { replace: true });
+        } else if (user.userType === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+      } else if (allowedRoles && !allowedRoles.includes(user.userType)) {
+        // Redirect if user role is not in allowed roles
         if (user.userType === 'patient') {
           navigate('/p/dashboard', { replace: true });
         } else if (user.userType === 'doctor') {
@@ -78,13 +96,19 @@ const ProtectedRoute = ({ children, userType }: { children: JSX.Element, userTyp
         }
       }
     }
-  }, [user, loading, userType, navigate, location.pathname]);
+  }, [user, loading, userType, allowedRoles, navigate, location.pathname]);
 
   if (loading) {
     return <div>Loading...</div>;
   }
 
-  return user && user.userType === userType ? children : null;
+  // Check if user exists and meets either userType OR allowedRoles criteria
+  const hasAccess = user && (
+    (userType && user.userType === userType) || 
+    (allowedRoles && allowedRoles.includes(user.userType))
+  );
+
+  return hasAccess ? children : null;
 };
 
 // Wrapper to apply AuthProvider only to the inner components
@@ -104,6 +128,7 @@ const AppWithAuth = () => {
         <Route path="records" element={<PatientRecords />} />
         <Route path="prescriptions" element={<PatientPrescriptions />} />
         <Route path="payments" element={<PatientPayments />} />
+        <Route path="insurance" element={<InsuranceClaims />} />
       </Route>
       
       {/* Doctor Routes */}

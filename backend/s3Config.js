@@ -22,8 +22,9 @@ const upload = multer({
       cb(null, { fieldName: file.fieldname });
     },
     key: (req, file, cb) => {
+      const prefix = req.isInsuranceClaim ? 'insurance-claims/' : 'medical-records/';
       const filename = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '')}`;
-      cb(null, `medical-records/${filename}`);
+      cb(null, `${prefix}${filename}`);
     }
   }),
   fileFilter: (req, file, cb) => {
