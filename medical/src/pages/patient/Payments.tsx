@@ -16,6 +16,10 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import InvoiceTemplate from '../../components/InvoiceTemplate';
+import { createRoot } from 'react-dom/client';
 
 // Add some custom CSS for the animations
 const animationStyles = `
@@ -305,55 +309,70 @@ const PatientPayments = () => {
 
   const handleDownloadReceipt = async (invoice: Invoice) => {
     try {
-      // Show loading state
-      toast.info("Preparing your receipt...");
+      toast.info("Preparing your invoice...");
+
+      // First, get more detailed invoice info including doctor name
+      const invoiceDetails = await paymentService.getInvoiceDetails(invoice.id);
       
-      // Create receipt data with invoice details
-      const receiptData = {
-        invoiceId: invoice.id,
-        description: invoice.description || 'Medical Service',
-        amount: parseFloat(String(invoice.amount || 0)),
-        date: new Date(invoice.created_at).toLocaleDateString(),
-        status: invoice.status,
-        patientId: invoice.patient_id
-      };
+      // Create a container for the invoice template
+      const invoiceContainer = document.createElement('div');
+      invoiceContainer.style.position = 'absolute';
+      invoiceContainer.style.left = '-9999px';
+      document.body.appendChild(invoiceContainer);
       
-      // Generate a receipt PDF - normally you'd call your backend for this
-      // For now we'll create a simple text receipt as a blob
-      const receiptText = `
-        RECEIPT
-        -------
-        
-        Invoice #: ${receiptData.invoiceId}
-        Date: ${receiptData.date}
-        Description: ${receiptData.description}
-        Amount: $${receiptData.amount.toFixed(2)}
-        Status: ${receiptData.status}
-        
-        Thank you for your payment!
-        
-        Smart Healthcare System
-      `;
+      // Render the invoice template inside the container
+      const invoiceRoot = createRoot(invoiceContainer);
       
-      // Create a blob from the receipt text
-      const blob = new Blob([receiptText], { type: 'text/plain' });
-      
-      // Create a download link and trigger it
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `receipt-${invoice.id}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-      
-      toast.success("Receipt downloaded successfully");
+      // Wait for invoice to render and capture as canvas
+      await new Promise<void>(resolve => {
+        invoiceRoot.render(
+          <InvoiceTemplate 
+            invoice={invoiceDetails} 
+            ref={(el) => {
+              if (el) {
+                // Use timeout to ensure the component is fully rendered
+                setTimeout(() => {
+                  // Convert the HTML to canvas
+                  html2canvas(el, {
+                    scale: 2, // Higher scale for better quality
+                    logging: false,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                  }).then(canvas => {
+                    // Create PDF from canvas
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({
+                      orientation: 'portrait',
+                      unit: 'mm',
+                      format: 'a4'
+                    });
+                    
+                    const imgWidth = 210; // A4 width in mm
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                    pdf.save(`invoice-${invoice.id}.pdf`);
+                    
+                    // Clean up
+                    invoiceRoot.unmount();
+                    document.body.removeChild(invoiceContainer);
+                    
+                    toast.success("Invoice downloaded successfully");
+                    resolve();
+                  }).catch(err => {
+                    console.error('Error generating PDF:', err);
+                    toast.error("Failed to generate invoice PDF");
+                    resolve();
+                  });
+                }, 500);
+              }
+            }}
+          />
+        );
+      });
     } catch (err) {
       console.error("Receipt download error:", err);
-      toast.error("Failed to download receipt");
+      toast.error("Failed to download invoice");
     }
   };
 
