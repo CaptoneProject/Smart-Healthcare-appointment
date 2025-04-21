@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./database');
 const doctorRoutes = require('./doctorRoutes');
+const prescriptionRoutes = require('./prescriptionRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 const app = express();
 
@@ -270,6 +272,40 @@ async function initDatabase() {
     `);
     console.log('Messaging system tables initialized');
 
+    // 13. Initialize prescription and refill tables
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS prescriptions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        doctor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        medication VARCHAR(255) NOT NULL,
+        dosage VARCHAR(255) NOT NULL,
+        instructions TEXT,
+        refills_remaining INTEGER NOT NULL DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'Active', -- Active, Expired, Refill Requested
+        prescribed_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        expiry_date DATE NOT NULL,
+        pharmacy VARCHAR(255),
+        warnings TEXT,
+        last_filled TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS refill_requests (
+        id SERIAL PRIMARY KEY,
+        prescription_id INTEGER REFERENCES prescriptions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        pharmacy VARCHAR(255) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending', -- pending, approved, rejected, completed
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_by INTEGER REFERENCES users(id)
+      );
+    `);
+    console.log('Prescription tables initialized');
+
     console.log('All database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -298,7 +334,7 @@ async function initDatabase() {
     // Configure routes
     app.use('/api/auth', authRouter);
     app.use('/api/appointments', appointmentsRoutes); 
-    app.use('/api/doctor', doctorRoutes);
+    app.use('/api/doctors', authenticateToken, doctorRoutes);
     app.use('/api/medical', authenticateToken, medicalRoutes);
     app.use('/api/admin', authenticateToken, adminRoutes);
     app.use('/api/payments', paymentRoutes);
@@ -306,6 +342,8 @@ async function initDatabase() {
     app.use('/api/doctor', authenticateToken, doctorSchedulingRoutes);
     app.use('/api/insurance', insuranceRoutes);
     app.use('/api/messaging', authenticateToken, messagingRoutes);
+    app.use('/api/prescriptions', authenticateToken, prescriptionRoutes);
+    app.use('/api/patients', authenticateToken, patientRoutes);
     
     // Error handling middleware
     app.use((err, req, res, next) => {

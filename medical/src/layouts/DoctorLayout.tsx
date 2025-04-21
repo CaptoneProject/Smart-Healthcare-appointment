@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate, NavLink } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Hospital, 
   Calendar, 
@@ -9,7 +9,9 @@ import {
   Home,
   Menu,
   CreditCard,
-  MessageCircle // Add this import
+  MessageCircle,
+  Pill,
+  FilePlus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from '../components/ui/NotificationBell';
@@ -19,14 +21,28 @@ const DoctorLayout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   const navigationItems = [
     { path: '/d/dashboard', label: 'Dashboard', icon: Home },
     { path: '/d/appointments', label: 'Appointments', icon: Calendar },
     { path: '/d/schedule', label: 'My Schedule', icon: Clock },
     { path: '/d/records', label: 'Medical Records', icon: FileText },
     { path: '/d/invoices', label: 'Invoices', icon: CreditCard },
-    { path: '/d/messages', label: 'Messages', icon: MessageCircle }, // Add this to your navigationItems array
+    { path: '/d/messages', label: 'Messages', icon: MessageCircle },
+    { 
+      icon: Pill, 
+      label: 'Prescriptions', 
+      path: '/d/prescriptions',
+      isActive: currentPath === '/d/prescriptions' || currentPath.startsWith('/d/prescriptions/refill')
+    },
+    { 
+      icon: FilePlus, 
+      label: 'Create Prescription', 
+      path: '/d/prescriptions/create',
+      isActive: currentPath === '/d/prescriptions/create'
+    },
   ];
 
   const handleLogout = async () => {
@@ -53,21 +69,19 @@ const DoctorLayout = () => {
         {/* Navigation */}
         <nav className="p-4">
           <ul className="space-y-2">
-            {navigationItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) => `
-                    flex items-center px-4 py-3 rounded-lg transition-colors
-                    ${isActive 
-                      ? 'bg-blue-500/20 text-blue-400' 
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white'}
-                  `}
-                >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  {item.label}
-                </NavLink>
-              </li>
+            {navigationItems.map((item, index) => (
+              <Link
+                key={index}
+                to={item.path}
+                className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
+                  item.isActive
+                    ? 'bg-blue-600/30 text-blue-100'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white/90'
+                }`}
+              >
+                <item.icon className="h-5 w-5 mr-3" />
+                {item.label}
+              </Link>
             ))}
           </ul>
         </nav>

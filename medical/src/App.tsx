@@ -29,6 +29,10 @@ import DoctorInvoices from './pages/doctor/Invoices'; // Import the new DoctorIn
 import InsuranceClaims from './pages/patient/InsuranceClaims'; // Add this import
 import PatientMessages from './pages/patient/Messages';
 import DoctorMessages from './pages/doctor/Messages';
+import PrescriptionRefills from './pages/doctor/PrescriptionRefills'; // Add this import
+import CreatePrescription from './pages/doctor/CreatePrescription'; // Add this import
+import RefillHistory from './pages/patient/RefillHistory'; // Add this import
+import ToasterProvider from './providers/ToasterProvider'; // Import the ToasterProvider
 
 // Update the ProtectedRoute to handle admin routes with better logging
 interface ProtectedRouteProps {
@@ -132,6 +136,7 @@ const AppWithAuth = () => {
         <Route path="payments" element={<PatientPayments />} />
         <Route path="insurance" element={<InsuranceClaims />} />
         <Route path="messages" element={<PatientMessages />} />
+        <Route path="prescriptions/refill-history" element={<RefillHistory />} /> {/* New route */}
       </Route>
       
       {/* Doctor Routes */}
@@ -147,6 +152,8 @@ const AppWithAuth = () => {
         <Route path="records" element={<MedicalRecords />} /> {/* New route */}
         <Route path="invoices" element={<DoctorInvoices />} /> {/* New route */}
         <Route path="messages" element={<DoctorMessages />} />
+        <Route path="prescriptions" element={<PrescriptionRefills />} /> {/* New route */}
+        <Route path="prescriptions/create" element={<CreatePrescription />} /> {/* New route */}
       </Route>
       
       {/* Standalone doctor routes */}
@@ -190,11 +197,14 @@ const AppWithAuth = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppWithAuth />
-      </AuthProvider>
-    </Router>
+    <>
+      <ToasterProvider />
+      <Router>
+        <AuthProvider>
+          <AppWithAuth />
+        </AuthProvider>
+      </Router>
+    </>
   );
 }
 

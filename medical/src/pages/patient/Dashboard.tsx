@@ -22,6 +22,7 @@ import { appointmentService, medicalService } from '../../services/api';
 import api from '../../services/api';
 import { formatDate, formatFullDate, formatTime } from '../../utils/dateTime';
 import PaymentReminder from '../../components/PaymentReminder'; // Import the component
+import prescriptionService from '../../services/prescriptionService'; // Import prescriptionService
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -171,6 +172,19 @@ const PatientDashboard: React.FC = () => {
           (appt: Appointment) => appt.status.toLowerCase() === 'confirmed'
         );
         
+        // Fetch prescriptions for active prescription count
+        let activePrescriptionsCount = 0;
+        try {
+          const prescriptionsData = await prescriptionService.getPatientPrescriptions();
+          // Count prescriptions with "Active" status
+          activePrescriptionsCount = prescriptionsData.filter(
+            (prescription) => prescription.status === 'Active'
+          ).length;
+          console.log(`Found ${activePrescriptionsCount} active prescriptions`);
+        } catch (error) {
+          console.error('Error fetching prescriptions:', error);
+        }
+        
         // Fetch medical records count
         let recentDocumentsCount = 0;
         try {
@@ -231,10 +245,10 @@ const PatientDashboard: React.FC = () => {
           console.error('Error fetching payment data:', error);
         }
         
-        // Update stats with all values including pending payments
+        // Update stats with all values including active prescriptions
         setStats({
           upcomingAppointments: confirmedAppointments.length,
-          activePrescriptions: 0,
+          activePrescriptions: activePrescriptionsCount,
           recentDocuments: recentDocumentsCount,
           pendingPayments: pendingPaymentsAmount
         });
