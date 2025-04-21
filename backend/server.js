@@ -342,7 +342,7 @@ async function initDatabase() {
     app.use('/api/doctor', authenticateToken, doctorSchedulingRoutes);
     app.use('/api/insurance', insuranceRoutes);
     app.use('/api/messaging', authenticateToken, messagingRoutes);
-    app.use('/api/prescriptions', authenticateToken, prescriptionRoutes);
+    app.use('/api/prescriptions', prescriptionRoutes);
     app.use('/api/patients', authenticateToken, patientRoutes);
     
     // Error handling middleware
