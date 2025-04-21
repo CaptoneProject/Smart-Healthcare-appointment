@@ -6,7 +6,8 @@ import {
   ArrowRight,
   User,
   LucideIcon,
-  Bell
+  Bell,
+  Pill // Add Pill icon for prescriptions
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
@@ -15,6 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/api';
+import prescriptionService from '../../services/prescriptionService'; // Import prescription service
 import { formatTime } from '../../utils/dateTime';
 
 interface DashboardCardProps {
@@ -142,9 +144,9 @@ const DoctorDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   
-  // Either use error variable or remove it
   const [error, setError] = useState<string | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<AppointmentData[]>([]);
+  const [pendingRefills, setPendingRefills] = useState<number>(0); // Add state for pending refills
   const [stats, setStats] = useState({
     todayCount: 0,
     pendingCount: 0,
@@ -183,6 +185,13 @@ const DoctorDashboard: React.FC = () => {
           type: appt.type || 'Consultation',
           status: appt.status || 'Scheduled'
         }));
+        
+        // Fetch pending prescription refill requests
+        const refillRequests = await prescriptionService.getDoctorRefillRequests();
+        const pendingRefillsCount = refillRequests.filter(
+          req => req.status === 'pending'
+        ).length;
+        setPendingRefills(pendingRefillsCount);
         
         // Use the defined type for filter operations
         setTodayAppointments(processedAppointments.filter((appt: AppointmentData) => {
@@ -235,16 +244,22 @@ const DoctorDashboard: React.FC = () => {
       title: "Today's Appointments",
       value: loading ? "..." : stats.todayCount,
       footer: "View schedule",
-      link: "/d/appointments?filter=today" // Changed from /d/schedule to /d/appointments with today filter
+      link: "/d/appointments?filter=today"
     },
     {
       icon: Clock,
-      title: "Pending Approvals", // Changed from "Pending Appointments"
+      title: "Pending Approvals",
       value: loading ? "..." : stats.pendingCount,
       footer: "View all",
-      link: "/d/appointments?filter=pending_approval" // Updated link with filter query param
+      link: "/d/appointments?filter=pending_approval"
     },
-    
+    {
+      icon: Pill, // Using Pill icon for prescriptions
+      title: "Refill Requests",
+      value: loading ? "..." : pendingRefills,
+      footer: "View requests",
+      link: "/d/prescriptions/refill" // Changed from /refills to /refill
+    },
     {
       icon: FileText,
       title: "Medical Records",
