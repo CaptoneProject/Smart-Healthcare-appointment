@@ -75,7 +75,7 @@ const prescriptionService = {
   // Get prescriptions for a specific patient (doctor access)
   getPatientPrescriptionsById: async (patientId: number): Promise<Prescription[]> => {
     try {
-      const response = await api.get(`/api/prescriptions/patient/${patientId}`);
+      const response = await api.get(`/prescriptions/patient/${patientId}`);
       return response.data || [];
     } catch (error: any) {
       console.error(`Error fetching prescriptions for patient ${patientId}:`, error);
@@ -89,32 +89,11 @@ const prescriptionService = {
   // Request a prescription refill
   requestRefill: async (refillData: RefillRequest): Promise<{ message: string; id: number }> => {
     try {
-      // Check all possible token storage options
-      const token = localStorage.getItem('token') || 
-                   sessionStorage.getItem('token') || 
-                   localStorage.getItem('authToken') || 
-                   sessionStorage.getItem('authToken');
+      // Debug info logging
+      console.log("Auth debug - Sending refill request with token");
       
-      // Get user info from all possible sources
-      let userInfo;
-      try {
-        userInfo = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-        // Add the token directly to the userInfo object for debugging
-        userInfo.hasToken = !!token;
-      } catch (e) {
-        console.error('Error parsing user info:', e);
-        userInfo = { hasToken: !!token };
-      }
-      
-      console.log("Auth debug - Sending refill request with token present:", !!token);
-      console.log("Auth debug - User info available:", userInfo);
-      
-      if (!token) {
-        console.warn("No auth token found in storage. Attempting request anyway...");
-      }
-      
-      // Make the API request with authorization - updated path
-      const response = await api.post('/api/prescriptions/refill', refillData);
+      // Remove the /api prefix from the URL path
+      const response = await api.post('/prescriptions/refill', refillData);
       console.log("Refill request successful, response:", response.data);
       return response.data;
     } catch (error: any) {
@@ -123,7 +102,7 @@ const prescriptionService = {
       // Check if error is an authentication issue
       if (error.response?.status === 401 || error.response?.status === 403) {
         console.error('Authentication error. Token may be invalid or expired.');
-        // Try to get more details about the stored token
+        // Log token details
         const tokenDetails = {
           localstorage: localStorage.getItem('token')?.substring(0, 10) + '...',
           sessionstorage: sessionStorage.getItem('token')?.substring(0, 10) + '...'
@@ -143,7 +122,7 @@ const prescriptionService = {
   // Get pending refill requests for doctor
   getDoctorRefillRequests: async (): Promise<RefillRequestResponse[]> => {
     try {
-      const response = await api.get('/api/prescriptions/refill/doctor/current');
+      const response = await api.get('/prescriptions/refill/doctor/current');
       return response.data || [];
     } catch (error: any) {
       console.error('Error fetching doctor refill requests:', error);
@@ -157,7 +136,7 @@ const prescriptionService = {
   // Get refill request history for patient
   getPatientRefillHistory: async (): Promise<RefillRequestResponse[]> => {
     try {
-      const response = await api.get('/api/prescriptions/refill/patient/current');
+      const response = await api.get('/prescriptions/refill/patient/current');
       return response.data || [];
     } catch (error: any) {
       console.error('Error fetching patient refill history:', error);
@@ -171,7 +150,7 @@ const prescriptionService = {
   // Approve refill request
   approveRefill: async (refillId: number): Promise<{ message: string }> => {
     try {
-      const response = await api.put(`/api/prescriptions/refill/${refillId}/approve`);
+      const response = await api.put(`/prescriptions/refill/${refillId}/approve`);
       return response.data;
     } catch (error: any) {
       console.error(`Error approving refill ${refillId}:`, error);
@@ -185,7 +164,7 @@ const prescriptionService = {
   // Reject refill request
   rejectRefill: async (refillId: number, reason: string): Promise<{ message: string }> => {
     try {
-      const response = await api.put(`/api/prescriptions/refill/${refillId}/reject`, { reason });
+      const response = await api.put(`/prescriptions/refill/${refillId}/reject`, { reason });
       return response.data;
     } catch (error: any) {
       console.error(`Error rejecting refill ${refillId}:`, error);
@@ -199,7 +178,7 @@ const prescriptionService = {
   // Create new prescription (doctor only)
   createPrescription: async (prescriptionData: any): Promise<{ message: string; id: number }> => {
     try {
-      const response = await api.post('/api/prescriptions', prescriptionData);
+      const response = await api.post('/prescriptions', prescriptionData);
       return response.data;
     } catch (error: any) {
       console.error('Error creating prescription:', error);
