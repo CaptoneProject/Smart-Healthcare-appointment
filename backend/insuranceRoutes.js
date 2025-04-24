@@ -77,6 +77,14 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
+    // Validate claim amount is positive
+    if (claimAmount <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid claim amount',
+        message: 'Claim amount must be greater than zero'
+      });
+    }
+    
     // Check if invoice exists and belongs to the patient
     const invoiceCheck = await db.query(`
       SELECT id, patient_id, status FROM invoices WHERE id = $1

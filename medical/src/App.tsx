@@ -33,6 +33,8 @@ import PrescriptionRefills from './pages/doctor/PrescriptionRefills'; // Add thi
 import CreatePrescription from './pages/doctor/CreatePrescription'; // Add this import
 import RefillHistory from './pages/patient/RefillHistory'; // Add this import
 import ToasterProvider from './providers/ToasterProvider'; // Import the ToasterProvider
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Update the ProtectedRoute to handle admin routes with better logging
 interface ProtectedRouteProps {
@@ -205,6 +207,7 @@ function App() {
           <AppWithAuth />
         </AuthProvider>
       </Router>
+      <ToastContainer position="top-right" autoClose={5000} />
     </>
   );
 }

@@ -27,7 +27,7 @@ export interface InsuranceClaimFormData {
   invoiceId: number;
   insuranceProvider: string;
   policyNumber: string;
-  claimAmount: number;
+  claimAmount: number | null;
   notes?: string;
 }
 
