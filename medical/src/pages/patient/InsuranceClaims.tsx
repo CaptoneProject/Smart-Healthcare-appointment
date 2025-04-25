@@ -171,6 +171,27 @@ const InsuranceClaims: React.FC = () => {
   };
   
   const handleCreateClaim = async () => {
+    // Add validation before proceeding
+    if (!formData.invoiceId) {
+      toast.error('Please select an invoice');
+      return;
+    }
+    
+    if (!formData.insuranceProvider.trim()) {
+      toast.error('Insurance provider is required');
+      return;
+    }
+    
+    if (!formData.policyNumber.trim()) {
+      toast.error('Policy number is required');
+      return;
+    }
+    
+    if (formData.claimAmount <= 0) {
+      toast.error('Claim amount must be greater than zero');
+      return;
+    }
+    
     try {
       await insuranceService.createClaim(formData);
       toast.success('Insurance claim created successfully');
@@ -689,6 +710,12 @@ const InsuranceClaims: React.FC = () => {
                 <div className="border-2 border-dashed border-white/10 rounded-lg p-6 text-center">
                   <Upload className="mx-auto h-8 w-8 text-white/40 mb-2" />
                   <p className="text-white/60 mb-4">Drag & drop files here or click to browse</p>
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <div className="inline-flex items-center justify-center px-4 py-2 border border-white/20 
+                         rounded-md text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 transition-colors">
+                      Select Files
+                    </div>
+                  </label>
                   <input
                     type="file"
                     multiple
@@ -697,15 +724,6 @@ const InsuranceClaims: React.FC = () => {
                     onChange={handleFileUpload}
                     accept=".pdf,.jpg,.jpeg,.png"
                   />
-                  <label htmlFor="file-upload">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      as="span"
-                    >
-                      Select Files
-                    </Button>
-                  </label>
                 </div>
               )}
             </div>
