@@ -93,7 +93,6 @@ const InvoiceManagement: React.FC<InvoiceManagementProps> = ({ userType, userId 
         }
       } catch (error) {
         console.error('Error fetching patients:', error);
-        toast.error('Could not load patient list');
       }
       
       if (patientsData.data) {
