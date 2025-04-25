@@ -35,7 +35,7 @@ const DoctorLayout = () => {
       icon: Pill, 
       label: 'Prescriptions', 
       path: '/d/prescriptions',
-      isActive: currentPath === '/d/prescriptions' || currentPath.startsWith('/d/prescriptions/refill')
+      isActive: currentPath === '/d/prescriptions' || currentPath.startsWith('/d/prescriptions/refills')
     },
     { 
       icon: FilePlus, 

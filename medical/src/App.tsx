@@ -138,7 +138,7 @@ const AppWithAuth = () => {
         <Route path="payments" element={<PatientPayments />} />
         <Route path="insurance" element={<InsuranceClaims />} />
         <Route path="messages" element={<PatientMessages />} />
-        <Route path="prescriptions/refill" element={<PrescriptionRefills />} /> {/* New route */}
+        <Route path="prescriptions/refills" element={<PrescriptionRefills />} /> {/* New route */}
         <Route path="prescriptions/refill-history" element={<RefillHistory />} /> {/* New route */}
       </Route>
       
@@ -155,8 +155,10 @@ const AppWithAuth = () => {
         <Route path="records" element={<MedicalRecords />} /> {/* New route */}
         <Route path="invoices" element={<DoctorInvoices />} /> {/* New route */}
         <Route path="messages" element={<DoctorMessages />} />
-        <Route path="prescriptions/create" element={<CreatePrescription />} /> {/* New route */}
-        <Route path="prescriptions/refill" element={<PrescriptionRefills />} /> {/* New route */}
+        {/* Add this new route */}
+        <Route path="prescriptions" element={<PrescriptionRefills />} /> 
+        <Route path="prescriptions/create" element={<CreatePrescription />} />
+        <Route path="prescriptions/refill" element={<PrescriptionRefills />} />
       </Route>
       
       {/* Standalone doctor routes */}
