@@ -8,12 +8,14 @@ import {
   AlertCircle,
   FileText,
   X,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { ModalPortal } from '../../components/ui/ModalPortal';
+import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { insuranceService, InsuranceClaim, InsuranceClaimFormData } from '../../services/insuranceService';
@@ -48,8 +50,13 @@ const InsuranceClaims: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(5);
+  const [totalPages, setTotalPages] = useState<number>(1);
   
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -107,6 +114,17 @@ const InsuranceClaims: React.FC = () => {
     
     setFilteredClaims(filtered);
   }, [claims, activeFilter, searchQuery]);
+
+  // Update totalPages when filtered claims change
+  useEffect(() => {
+    const newTotalPages = Math.max(1, Math.ceil(filteredClaims.length / itemsPerPage));
+    setTotalPages(newTotalPages);
+    
+    // If current page is out of bounds after filtering, reset to page 1
+    if (currentPage > newTotalPages) {
+      setCurrentPage(1);
+    }
+  }, [filteredClaims, itemsPerPage]);
   
   const fetchData = async () => {
     try {
@@ -126,10 +144,10 @@ const InsuranceClaims: React.FC = () => {
       );
       setInvoices(eligibleInvoices);
       
-      setError(null);
+      setErrorMessage(null);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Failed to load data. Please try again.');
+      setErrorMessage('Failed to load data. Please try again.');
       toast.error('An error occurred while loading data');
     } finally {
       setLoading(false);
@@ -322,6 +340,29 @@ const InsuranceClaims: React.FC = () => {
     }
   };
 
+  const paginatedClaims = filteredClaims.slice(
+    (currentPage - 1) * itemsPerPage, 
+    currentPage * itemsPerPage
+  );
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -370,35 +411,18 @@ const InsuranceClaims: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/20"></div>
           </div>
-        ) : error ? (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
-            <AlertCircle className="mx-auto h-6 w-6 text-red-400 mb-2" />
-            <p className="text-red-400">{error}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={fetchData} 
-              className="mt-2"
-            >
-              Retry
-            </Button>
+        ) : errorMessage ? (
+          <div className="text-center py-8">
+            <AlertCircle className="mx-auto h-10 w-10 text-red-400 mb-2" />
+            <p className="text-white/60">{errorMessage}</p>
           </div>
         ) : filteredClaims.length === 0 ? (
           <div className="text-center py-8">
-            <FileText className="mx-auto h-12 w-12 text-white/20 mb-4" />
-            <h3 className="text-lg font-medium text-white/80 mb-2">No claims found</h3>
-            <p className="text-white/60 mb-6">You haven't created any insurance claims yet</p>
-            <Button 
-              variant="primary" 
-              size="md" 
-              icon={<Plus className="w-4 h-4" />} 
-              onClick={openCreateModal}
-            >
-              Create Your First Claim
-            </Button>
+            <FileText className="mx-auto h-10 w-10 text-white/40 mb-2" />
+            <p className="text-white/60">No insurance claims found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -426,7 +450,7 @@ const InsuranceClaims: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredClaims.map((claim) => (
+                {paginatedClaims.map(claim => (
                   <tr key={claim.id} className="hover:bg-white/5">
                     <td className="px-4 py-4 whitespace-nowrap text-white/90">
                       <div className="text-sm">{claim.invoice_description || 'Medical Service'}</div>
@@ -476,6 +500,89 @@ const InsuranceClaims: React.FC = () => {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination UI */}
+            {filteredClaims.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+                <div className="text-sm text-white/60">
+                  Showing {filteredClaims.length > 0 ? ((currentPage - 1) * itemsPerPage + 1) : 0} to {Math.min(currentPage * itemsPerPage, filteredClaims.length)} of {filteredClaims.length} claims
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                    className={`p-2 rounded-md ${
+                      currentPage === 1 
+                        ? 'text-white/30 cursor-not-allowed' 
+                        : 'text-white/70 hover:bg-white/10'
+                    }`}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => goToPage(pageNum)}
+                        className={`w-8 h-8 mx-1 rounded-md ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'text-white/70 hover:bg-white/10'
+                        }`}
+                        aria-label={`Page ${pageNum}`}
+                        aria-current={currentPage === pageNum ? 'page' : undefined}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages}
+                    className={`p-2 rounded-md ${
+                      currentPage === totalPages 
+                        ? 'text-white/30 cursor-not-allowed' 
+                        : 'text-white/70 hover:bg-white/10'
+                    }`}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Items per page selector */}
+                  <div className="flex items-center ml-4">
+                    <label className="text-sm text-white/60 mr-2">Items per page:</label>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-slate-800 border border-white/10 rounded-lg p-1 text-sm text-white/80"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -496,11 +603,18 @@ const InsuranceClaims: React.FC = () => {
                 onChange={(e) => setFormData({...formData, invoiceId: Number(e.target.value)})}
               >
                 <option value={0}>Select an invoice</option>
-                {invoices.map(invoice => (
-                  <option key={invoice.id} value={invoice.id}>
-                    {invoice.description || 'Medical Service'} - ${parseFloat(String(invoice.amount)).toFixed(2)}
-                  </option>
-                ))}
+                {invoices.map(invoice => {
+                  // Format date for better readability
+                  const date = invoice.created_at ? new Date(invoice.created_at) : null;
+                  const formattedDate = date ? 
+                    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                  
+                  return (
+                    <option key={invoice.id} value={invoice.id}>
+                      [${parseFloat(String(invoice.amount)).toFixed(2)}] {invoice.description || 'Medical service'} - {formattedDate}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             

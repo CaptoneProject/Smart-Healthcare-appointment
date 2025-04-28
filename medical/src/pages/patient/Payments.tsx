@@ -11,7 +11,9 @@ import {
   AlertCircle,
   Receipt,
   X,
-  Star
+  Star,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -20,6 +22,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import InvoiceTemplate from '../../components/InvoiceTemplate';
 import { createRoot } from 'react-dom/client';
+import { Button } from '../../components/ui/Button';
 
 // Add some custom CSS for the animations
 const animationStyles = `
@@ -140,6 +143,11 @@ const PatientPayments = () => {
   const [cvv, setCvv] = useState<string>('');
   const [cardholderName, setCardholderName] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(5);
+  const [totalPages, setTotalPages] = useState<number>(1);
 
   useEffect(() => {
     if (user?.id) {
@@ -396,6 +404,42 @@ const PatientPayments = () => {
     return true;
   });
 
+  // Pagination logic
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * itemsPerPage, 
+    currentPage * itemsPerPage
+  );
+
+  // Update totalPages when filtered invoices change
+  useEffect(() => {
+    const newTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / itemsPerPage));
+    setTotalPages(newTotalPages);
+    
+    // If current page is out of bounds after filtering, reset to page 1
+    if (currentPage > newTotalPages) {
+      setCurrentPage(1);
+    }
+  }, [filteredInvoices, itemsPerPage]); // This dependency array now correctly includes itemsPerPage
+
+  // Pagination helper functions
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   // Calculate stats
   const stats: Stats = {
     dueThisMonth: 0,
@@ -608,60 +652,150 @@ const PatientPayments = () => {
         <div className="flex justify-center p-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
-      ) : filteredInvoices.length > 0 ? (
+      ) : paginatedInvoices.length > 0 ? (
         <div className="space-y-4">
-          <table className="min-w-full bg-slate-900 rounded-xl border border-white/10">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Description</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Status</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map(invoice => (
-                <tr key={invoice.id} className={invoice.status !== 'approved' && invoice.status !== 'paid' ? 'opacity-60' : ''}>
-                  <td className="px-6 py-4">{invoice.description || 'Medical Service'}</td>
-                  <td className="px-6 py-4">${parseFloat(String(invoice.amount || 0)).toFixed(2)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs rounded-full capitalize inline-flex items-center space-x-1 ${
-                      invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                      invoice.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {invoice.status === 'paid' ? <CheckCircle className="w-3 h-3 mr-1" /> : 
-                       invoice.status === 'approved' ? <Clock className="w-3 h-3 mr-1" /> : 
-                       <AlertCircle className="w-3 h-3 mr-1" />}
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 flex items-center space-x-2">
-                    {/* View Details Button */}
-                    <button
-                      onClick={() => handleViewDetails(invoice)}
-                      className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-600 transition-colors"
-                    >
-                      Details
-                    </button>
+          <div className="grid grid-cols-12 gap-4 py-3 border-b border-white/10 items-center">
+            <div className="col-span-4">
+              <p className="text-sm text-gray-400">Description</p>
+            </div>
+            <div className="col-span-3">
+              <p className="text-sm text-gray-400">Amount</p>
+            </div>
+            <div className="col-span-3">
+              <p className="text-sm text-gray-400">Status</p>
+            </div>
+            <div className="col-span-2 text-right">
+              <p className="text-sm text-gray-400">Actions</p>
+            </div>
+          </div>
+          {paginatedInvoices.map(invoice => (
+            <div key={invoice.id} className="grid grid-cols-12 gap-4 py-3 border-b border-white/10 items-center">
+              <div className="col-span-4">
+                <p>{invoice.description || 'Medical Service'}</p>
+              </div>
+              <div className="col-span-3">
+                <p>${parseFloat(String(invoice.amount || 0)).toFixed(2)}</p>
+              </div>
+              <div className="col-span-3">
+                <span className={`px-2 py-1 text-xs rounded-full capitalize inline-flex items-center space-x-1 ${
+                  invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                  invoice.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
+                  'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {invoice.status === 'paid' ? <CheckCircle className="w-3 h-3 mr-1" /> : 
+                   invoice.status === 'approved' ? <Clock className="w-3 h-3 mr-1" /> : 
+                   <AlertCircle className="w-3 h-3 mr-1" />}
+                  {invoice.status}
+                </span>
+              </div>
+              <div className="col-span-2 text-right">
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleViewDetails(invoice)}
+                  >
+                    Details
+                  </Button>
+                  
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={invoice.status.toLowerCase() === 'paid'}
+                    onClick={() => handlePayNow(invoice)}
+                  >
+                    {invoice.status.toLowerCase() === 'paid' ? 'Paid' : 'Pay Now'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
 
-                    {/* Pay Now Button */}
-                    <button
-                      disabled={invoice.status !== 'approved'}
-                      onClick={() => handlePayNow(invoice)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        invoice.status !== 'approved'
-                          ? 'bg-gray-500/50 text-gray-200 cursor-not-allowed'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                    >
-                      {invoice.status === 'pending' ? 'Awaiting Approval' : 'Pay Now'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Pagination */}
+          {filteredInvoices.length > itemsPerPage && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+              <div className="text-sm text-white/60">
+                Showing {filteredInvoices.length > 0 ? ((currentPage - 1) * itemsPerPage + 1) : 0} to {Math.min(currentPage * itemsPerPage, filteredInvoices.length)} of {filteredInvoices.length} invoices
+              </div>
+              <div className="flex items-center">
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-md ${
+                    currentPage === 1 
+                      ? 'text-white/30 cursor-not-allowed' 
+                      : 'text-white/70 hover:bg-white/10'
+                  }`}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                
+                {/* Page numbers */}
+                <div className="flex items-center mx-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => goToPage(pageNum)}
+                        className={`w-8 h-8 mx-1 rounded-md ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'text-white/70 hover:bg-white/10'
+                        }`}
+                        aria-label={`Page ${pageNum}`}
+                        aria-current={currentPage === pageNum ? 'page' : undefined}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-md ${
+                    currentPage === totalPages 
+                      ? 'text-white/30 cursor-not-allowed' 
+                      : 'text-white/70 hover:bg-white/10'
+                  }`}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                
+                {/* Items per page selector */}
+                <div className="flex items-center ml-4">
+                  <label className="text-sm text-white/60 mr-2">Items per page:</label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="bg-slate-800 border border-white/10 rounded-lg p-1 text-sm text-white/80"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-slate-900 rounded-xl border border-white/10 p-12 flex flex-col items-center justify-center">
