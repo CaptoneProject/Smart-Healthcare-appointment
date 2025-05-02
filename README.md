@@ -3,7 +3,7 @@
 
 Smart Healthcare Appointment is a modern web platform for managing healthcare appointments, medical records, prescriptions, payments, and secure communication between patients and healthcare providers. The system prioritizes security, compliance, and user experience for healthcare professionals and patients.
 
-[![License](https://img.shields.io/badge/License-Educational-blue.svg)]() 
+
 
 ## 🌟 Features
 
