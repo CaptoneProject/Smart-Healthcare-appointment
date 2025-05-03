@@ -72,9 +72,37 @@ router.post('/', authenticateToken, async (req, res) => {
       notes 
     } = req.body;
     
-    // Validate required fields
-    if (!invoiceId || !insuranceProvider || !policyNumber || !claimAmount) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Validate required fields with specific error messages
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'Missing required field', message: 'Invoice ID is required' });
+    }
+    
+    if (!insuranceProvider) {
+      return res.status(400).json({ error: 'Missing required field', message: 'Insurance provider is required' });
+    }
+    
+    // Add insurance provider length validation
+    if (insuranceProvider.length > 100) {
+      return res.status(400).json({ 
+        error: 'Invalid insurance provider', 
+        message: 'Insurance provider name cannot exceed 100 characters'
+      });
+    }
+    
+    if (!policyNumber) {
+      return res.status(400).json({ error: 'Missing required field', message: 'Policy number is required' });
+    }
+    
+    if (!claimAmount && claimAmount !== 0) {
+      return res.status(400).json({ error: 'Missing required field', message: 'Claim amount is required' });
+    }
+    
+    // Validate policy number length (maximum 50 characters)
+    if (policyNumber.length > 50) {
+      return res.status(400).json({ 
+        error: 'Invalid policy number', 
+        message: 'Policy number cannot exceed 50 characters'
+      });
     }
     
     // Validate claim amount is positive
@@ -85,9 +113,27 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
     
+    // Validate claim amount has max 2 decimal places
+    const decimalPlaces = claimAmount.toString().split('.')[1]?.length || 0;
+    if (decimalPlaces > 2) {
+      return res.status(400).json({
+        error: 'Invalid claim amount',
+        message: 'Claim amount cannot have more than 2 decimal places'
+      });
+    }
+    
+    // Validate maximum claim amount
+    const MAX_CLAIM_AMOUNT = 999999.99;
+    if (claimAmount > MAX_CLAIM_AMOUNT) {
+      return res.status(400).json({
+        error: 'Invalid claim amount',
+        message: `Claim amount cannot exceed $${MAX_CLAIM_AMOUNT.toLocaleString()}`
+      });
+    }
+    
     // Check if invoice exists and belongs to the patient
     const invoiceCheck = await db.query(`
-      SELECT id, patient_id, status FROM invoices WHERE id = $1
+      SELECT id, patient_id, status, amount FROM invoices WHERE id = $1
     `, [invoiceId]);
     
     if (invoiceCheck.rows.length === 0) {
@@ -99,6 +145,26 @@ router.post('/', authenticateToken, async (req, res) => {
     // Check if user is the owner of the invoice
     if (req.user.userId !== invoice.patient_id && req.user.userType !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    // Check if claim already exists for this invoice
+    const existingClaimCheck = await db.query(`
+      SELECT id FROM insurance_claims WHERE invoice_id = $1
+    `, [invoiceId]);
+    
+    if (existingClaimCheck.rows.length > 0) {
+      return res.status(409).json({ 
+        error: 'Duplicate claim', 
+        message: 'A claim for this invoice already exists' 
+      });
+    }
+    
+    // Validate claim amount against invoice total
+    if (claimAmount > invoice.amount) {
+      return res.status(400).json({
+        error: 'Invalid claim amount',
+        message: 'Claim amount cannot exceed invoice total'
+      });
     }
     
     // Create the claim
@@ -140,7 +206,10 @@ router.put('/:claimId', authenticateToken, async (req, res) => {
     
     // Check if claim exists and belongs to the patient
     const claimCheck = await db.query(`
-      SELECT id, patient_id, status FROM insurance_claims WHERE id = $1
+      SELECT ic.id, ic.patient_id, ic.status, ic.invoice_id, i.amount as invoice_amount
+      FROM insurance_claims ic
+      JOIN invoices i ON ic.invoice_id = i.id
+      WHERE ic.id = $1
     `, [claimId]);
     
     if (claimCheck.rows.length === 0) {
@@ -160,6 +229,60 @@ router.put('/:claimId', authenticateToken, async (req, res) => {
         error: 'Cannot update claim', 
         message: 'Only claims in draft status can be updated' 
       });
+    }
+    
+    // Validate policy number if provided
+    if (policyNumber !== undefined) {
+      if (!policyNumber.trim()) {
+        return res.status(400).json({ 
+          error: 'Invalid policy number', 
+          message: 'Policy number is required'
+        });
+      }
+      
+      if (policyNumber.length > 50) {
+        return res.status(400).json({ 
+          error: 'Invalid policy number', 
+          message: 'Policy number cannot exceed 50 characters'
+        });
+      }
+    }
+    
+    // Validate claim amount if provided
+    if (claimAmount !== undefined) {
+      // Validate claim amount is positive
+      if (claimAmount <= 0) {
+        return res.status(400).json({ 
+          error: 'Invalid claim amount',
+          message: 'Claim amount must be greater than zero'
+        });
+      }
+      
+      // Validate claim amount has max 2 decimal places
+      const decimalPlaces = claimAmount.toString().split('.')[1]?.length || 0;
+      if (decimalPlaces > 2) {
+        return res.status(400).json({
+          error: 'Invalid claim amount',
+          message: 'Claim amount cannot have more than 2 decimal places'
+        });
+      }
+      
+      // Validate maximum claim amount
+      const MAX_CLAIM_AMOUNT = 999999.99;
+      if (claimAmount > MAX_CLAIM_AMOUNT) {
+        return res.status(400).json({
+          error: 'Invalid claim amount',
+          message: `Claim amount cannot exceed $${MAX_CLAIM_AMOUNT.toLocaleString()}`
+        });
+      }
+      
+      // Validate claim amount against invoice total
+      if (claimAmount > claim.invoice_amount) {
+        return res.status(400).json({
+          error: 'Invalid claim amount',
+          message: 'Claim amount cannot exceed invoice total'
+        });
+      }
     }
     
     // Update the claim
