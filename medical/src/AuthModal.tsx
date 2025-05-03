@@ -135,7 +135,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
       } else if (userType === 'doctor') {
         loginResponse = await login('doctor2@gmail.com', 'doctor@2');
       } else {
-        loginResponse = await login('patient10@gmail.com', 'patient@10');
+        loginResponse = await login('patient11@gmail.com', 'patient@11');
       }
 
       // Check localStorage for token
